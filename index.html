@@ -258,7 +258,13 @@ textarea.input{min-height:80px;resize:vertical}
       <div class="rate"><span>느리게</span><input id="rate" type="range" min="0.6" max="1.6" step="0.1" value="1"><span>빠르게</span><b id="rateVal">1.0×</b></div>
     </div>
 
-    <label class="switch"><span>실시간 미리보기<small>말하는 도중에도 번역을 미리 보여줘요</small></span><input type="checkbox" id="liveOn"></label>
+    <div class="group">
+      <span class="lab">문장이 끝났다고 판단할 멈춤 시간</span>
+      <div class="rate"><span>짧게</span><input id="gap" type="range" min="0.6" max="2.5" step="0.1" value="1"><span>길게</span><b id="gapVal">1.0초</b></div>
+      <p class="hint">말하다 잠깐 멈췄는데 문장이 중간에 끊기면 길게, 통역이 늦게 나오면 짧게 조절하세요.</p>
+    </div>
+
+    <label class="switch"><span>실시간 미리보기<small>말하는 동안 문장 전체의 번역을 미리 보여줘요</small></span><input type="checkbox" id="liveOn"></label>
     <label class="switch"><span>에코 방지<small>통역 음성이 나오는 동안 마이크를 잠시 멈춰요. 이어폰을 쓰면 꺼도 돼요</small></span><input type="checkbox" id="echoGuard"></label>
 
     <div class="group">
@@ -281,7 +287,7 @@ textarea.input{min-height:80px;resize:vertical}
     get(k, d){ try { const v = localStorage.getItem('interp.'+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v){ try { localStorage.setItem('interp.'+k, JSON.stringify(v)); } catch {} },
   };
-  const S = Object.assign({ rate:1, liveOn:true, echoGuard:true, convMode:'auto' }, store.get('settings', {}));
+  const S = Object.assign({ rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto' }, store.get('settings', {}));
   for (const k of ['engine','apiKey','model','tone','glossary','target']) delete S[k];
   const save = () => store.set('settings', S);
   const T = () => LANGS.en;
@@ -425,7 +431,9 @@ textarea.input{min-height:80px;resize:vertical}
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null, listening = false, mode = 'me', pausedForTts = false;
   let switching = false, turnTimer = null, heardThisTurn = false, held = [];
-  const TURN_GAP = 1200; // ms of silence that ends a turn in auto mode
+  // sentence buffer: words are collected here and translated once, after the speaker pauses
+  let utter = { finals:'', interim:'' }, sentTimer = null;
+  const gapMs = () => Math.round((S.gap || 1) * 1000);
   let liveCtl = null, liveTimer = null, liveSeq = 0;
   const pair = m => m === 'me' ? { from: KO, to: T() } : { from: T(), to: KO };
 
@@ -433,8 +441,9 @@ textarea.input{min-height:80px;resize:vertical}
     if (!SR) return;
     const { from } = pair(mode);
     const me = rec = new SR();
+    utter = { finals:'', interim:'' }; clearTimeout(sentTimer);
     rec.lang = from.stt; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
-    rec.onresult = onResult;
+    rec.onresult = e => { if (rec === me) onResult(e); };
     rec.onerror = e => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { stopAll(); toast('마이크 권한을 허용해 주세요'); }
       else if (e.error === 'language-not-supported') { stopAll(); toast(`이 기기는 ${from.name} 음성 인식을 지원하지 않아요`); }
@@ -443,19 +452,42 @@ textarea.input{min-height:80px;resize:vertical}
     try { rec.start(); } catch {}
     paint();
   }
+  // Phones often resend the whole sentence-so-far as each new "final" piece ("안녕", "안녕하세요", "안녕하세요 체크인…").
+  // Merge those so every word appears once.
+  const norm = t => t.replace(/[\s.,!?。]+/g, '').toLowerCase();
+  function merge(acc, t){
+    if (!t) return acc; if (!acc) return t;
+    const a = norm(acc), b = norm(t);
+    if (b.startsWith(a)) return t;          // t repeats acc and adds more
+    if (a.includes(b)) return acc;          // t already said
+    return acc + ' ' + t;
+  }
+  const currentText = () => merge(utter.finals, utter.interim).trim();
   function onResult(e){
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
+    let finals = '', interim = '';
+    for (let i = 0; i < e.results.length; i++) {
       const r = e.results[i], t = r[0].transcript.trim();
       if (!t) continue;
-      if (r.isFinal) { handleFinal(t); heardThisTurn = true; } else interim += (interim ? ' ' : '') + t;
+      if (r.isFinal) finals = merge(finals, t); else interim = merge(interim, t);
     }
-    if (isAuto()) {
-      clearTimeout(turnTimer);
-      if (heardThisTurn && !interim) turnTimer = setTimeout(endTurn, TURN_GAP);
-    }
-    $('liveSrc').textContent = interim || placeholder();
-    if (interim) scheduleLive(interim); else $('liveDst').textContent = '';
+    utter = { finals, interim };
+    const text = currentText();
+    $('liveSrc').textContent = text || placeholder();
+    if (text) scheduleLive(text); else $('liveDst').textContent = '';
+    clearTimeout(sentTimer); clearTimeout(turnTimer);
+    // the sentence ends after a pause; wait a little longer if the phone hasn't finalised the last words yet
+    if (text) sentTimer = setTimeout(commitSentence, interim ? gapMs() + 1200 : gapMs());
+  }
+  function takeUtter(){ clearTimeout(sentTimer); const t = currentText(); utter = { finals:'', interim:'' }; return t; }
+  function commitSentence(){
+    if (!listening || switching) return;
+    const text = takeUtter();
+    if (!text) return;
+    heardThisTurn = true;
+    handleFinal(text);
+    if (isAuto()) { endTurn(); return; }
+    // start a fresh recognizer session so the next sentence doesn't carry over earlier words
+    if (!pausedForTts) { const old = rec; rec = null; try { old?.abort(); } catch {} startRec(); }
   }
   function scheduleLive(text){
     if (!S.liveOn) return;
@@ -497,6 +529,8 @@ textarea.input{min-height:80px;resize:vertical}
   async function endTurn(){
     if (!listening || switching) return;
     clearTimeout(turnTimer);
+    const pending = takeUtter();
+    if (pending) handleFinal(pending);
     switching = true; heardThisTurn = false;
     const old = rec; rec = null; try { old?.abort(); } catch {}
     $('liveSrc').textContent = ''; $('liveDst').textContent = '';
@@ -532,6 +566,8 @@ textarea.input{min-height:80px;resize:vertical}
   function stopAll(){
     listening = false; pausedForTts = false; switching = false; heardThisTurn = false;
     clearTimeout(turnTimer);
+    const pending = takeUtter();
+    if (pending) handleFinal(pending);
     for (const [t, tag] of held.splice(0)) speak(t, tag);
     try { rec?.stop(); } catch {} rec = null;
     paint();
@@ -603,14 +639,16 @@ textarea.input{min-height:80px;resize:vertical}
   const dlg = $('settings'), form = dlg.querySelector('form');
   function fill(){
     $('rate').value = S.rate; $('rateVal').textContent = Number(S.rate).toFixed(1) + '×';
+    $('gap').value = S.gap; $('gapVal').textContent = Number(S.gap).toFixed(1) + '초';
     $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard;
     drawVoices();
   }
   $('openSettings').onclick = () => { fill(); dlg.showModal(); };
   dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+  $('gap').oninput = () => { $('gapVal').textContent = Number($('gap').value).toFixed(1) + '초'; };
   $('rate').oninput = () => { $('rateVal').textContent = Number($('rate').value).toFixed(1) + '×'; };
   dlg.addEventListener('close', () => {
-    Object.assign(S, { rate: Number($('rate').value), liveOn: $('liveOn').checked, echoGuard: $('echoGuard').checked });
+    Object.assign(S, { rate: Number($('rate').value), gap: Number($('gap').value), liveOn: $('liveOn').checked, echoGuard: $('echoGuard').checked });
     save();
   });
 
