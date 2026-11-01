@@ -335,7 +335,7 @@ textarea.input{min-height:80px;resize:vertical}
   for (const k of ['engine','apiKey','model','tone','glossary']) delete S[k];
   if (!['en','ja','vi','th'].includes(S.target)) S.target = 'en';
   delete S.voiceGender;
-  if (typeof S.voiceChoice !== 'object' || !S.voiceChoice) S.voiceChoice = {};
+  if (typeof S.voiceChoice !== 'object' || !S.voiceChoice || !S.voiceV3) { S.voiceChoice = {}; S.voiceV3 = true; }
   const save = () => store.set('settings', S);
   const T = () => LANGS[S.target];
   const isAuto = () => S.convMode === 'auto';
@@ -453,9 +453,9 @@ textarea.input{min-height:80px;resize:vertical}
   let voices = [];
   // Browsers don't label voices as male or female, so we go by well-known voice names
   // (iPhone: Aaron, Daniel, Otoya, Minsu… / Android: en-us-x-iol…). Joke/robot voices are never picked automatically.
-  const FEMALE_RX = /female|woman|samantha|karen|moira|tessa|fiona|victoria|\bava\b|allison|susan|zoe|nicky|kyoko|o-ren|yuna|sora|kanya|narisa|linh|kathy|-iob-|-iog-|-sfg-|-tpc-|-tpf-|-htm-|-jab-|-ism-|-kob-/i;
-  const MALE_RX = /\bmale\b|\bman\b|aaron|daniel|arthur|gordon|oliver|rishi|\btom\b|\balex\b|evan|nathan|otoya|hattori|minsu|-iol-|-iom-|-tpd-|-jac-|-jad-|-koc-|-kod-/i;
-  const NOVELTY_RX = /bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|eddy|\bflo\b|grandma|grandpa|\breed\b|rocko|sandy|shelley|albert|\bfred\b|junior|ralph/i;
+  const FEMALE_RX = /female|woman|samantha|karen|moira|tessa|fiona|victoria|\bava\b|allison|susan|zoe|nicky|kyoko|o-ren|yuna|sora|kanya|narisa|linh|kathy|\bflo\b|sandy|shelley|grandma|-iob-|-iog-|-sfg-|-tpc-|-tpf-|-htm-|-jab-|-ism-|-kob-/i;
+  const MALE_RX = /\bmale\b|\bman\b|aaron|daniel|arthur|gordon|oliver|rishi|\btom\b|\balex\b|evan|nathan|otoya|hattori|minsu|eddy|\breed\b|rocko|grandpa|\bfred\b|junior|ralph|albert|-iol-|-iom-|-tpd-|-jac-|-jad-|-koc-|-kod-/i;
+  const NOVELTY_RX = /bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox/i;
   const voiceGender = v => FEMALE_RX.test(v.name) ? 'female' : MALE_RX.test(v.name) ? 'male' : null;
   function vnorm(v){ return v.lang.replace('_','-'); }
   function voicesFor(tag){
@@ -464,13 +464,19 @@ textarea.input{min-height:80px;resize:vertical}
     const score = v => (vnorm(v) === tag ? 2 : 0) + (/google|premium|enhanced|natural/i.test(v.name) ? 1 : 0);
     return list.map((v, i) => [v, i]).sort((a, b) => score(b[0]) - score(a[0]) || a[1] - b[1]).map(x => x[0]);
   }
+  // exactly how the first version chose a voice (the one that gave the good male voice)
+  function firstVersionPick(tag){
+    const list = voices.filter(v => vnorm(v).toLowerCase().startsWith(tag.slice(0,2).toLowerCase()));
+    return list.find(v => vnorm(v) === tag && /google|premium|enhanced|natural/i.test(v.name)) || list.find(v => vnorm(v) === tag) || list[0] || null;
+  }
   function autoVoice(tag, gender){
-    const list = voicesFor(tag);
-    const good = list.filter(v => !NOVELTY_RX.test(v.name));
-    return good.find(v => voiceGender(v) === gender)
-        // nothing named for that gender: take the phone's usual voice unless we know it's the other gender
-        || good.find(v => voiceGender(v) !== (gender === 'male' ? 'female' : 'male'))
-        || good[0] || list[0] || null;
+    const orig = firstVersionPick(tag);
+    const other = gender === 'male' ? 'female' : 'male';
+    // keep the original voice unless we know for sure it's the other gender
+    if (orig && voiceGender(orig) !== other) return orig;
+    const eloq = v => /eddy|\bflo\b|grandma|grandpa|\breed\b|rocko|sandy|shelley/i.test(v.name) ? 1 : 0;   // character voices last
+    const named = voicesFor(tag).filter(v => voiceGender(v) === gender && !NOVELTY_RX.test(v.name)).sort((x, y) => eloq(x) - eloq(y))[0];
+    return named || orig;
   }
   function loadVoices(){ voices = synth ? synth.getVoices() : []; drawVoices(); if (typeof drawVoicePickers === 'function' && $('settings').open) drawVoicePickers(); }
   if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
@@ -775,11 +781,11 @@ textarea.input{min-height:80px;resize:vertical}
     sel.value = S.voiceChoice[choiceKey(tag, gender)] || '';
     if (sel.value !== (S.voiceChoice[choiceKey(tag, gender)] || '')) sel.value = '';
     sel.disabled = !list.length;
-    const anyOfGender = list.some(v => voiceGender(v) === gender && !NOVELTY_RX.test(v.name));
+    const anyOfGender = auto && voiceGender(auto) !== (gender === 'male' ? 'female' : 'male');
     hint.hidden = list.length > 0 && anyOfGender;
     hint.textContent = !list.length
       ? '이 휴대폰에 이 언어의 기기 음성이 없어서 온라인 음성(여자)으로 나와요. 기기 음성을 설치하면 목소리를 고를 수 있어요.'
-      : `${gender === 'male' ? '남자' : '여자'} 목소리 이름을 찾지 못했어요. 목록에서 하나씩 미리 들어보고 맞는 목소리를 골라 주세요.`;
+      : `${gender === 'male' ? '남자' : '여자'} 목소리를 찾지 못했어요. 목록에서 하나씩 미리 들어보고 맞는 목소리를 골라 주세요.`;
     sel.onchange = () => { const k = choiceKey(tag, gender); if (sel.value) S.voiceChoice[k] = sel.value; else delete S.voiceChoice[k]; save(); };
   }
   function drawVoicePickers(){
