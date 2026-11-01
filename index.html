@@ -270,6 +270,7 @@ textarea.input{min-height:80px;resize:vertical}
       <p class="hint">말하다 잠깐 멈췄는데 문장이 중간에 끊기면 길게, 통역이 늦게 나오면 짧게 조절하세요.</p>
     </div>
 
+    <label class="switch"><span>대화 맥락 반영<small>앞에서 나눈 대화를 함께 보내서, 생략된 주어나 짧은 대답도 흐름에 맞게 번역해요</small></span><input type="checkbox" id="ctxOn"></label>
     <label class="switch"><span>실시간 미리보기<small>말하는 동안 문장 전체의 번역을 미리 보여줘요</small></span><input type="checkbox" id="liveOn"></label>
     <label class="switch"><span>에코 방지<small>통역 음성이 나오는 동안 마이크를 잠시 멈춰요. 이어폰을 쓰면 꺼도 돼요</small></span><input type="checkbox" id="echoGuard"></label>
 
@@ -293,7 +294,7 @@ textarea.input{min-height:80px;resize:vertical}
     get(k, d){ try { const v = localStorage.getItem('interp.'+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v){ try { localStorage.setItem('interp.'+k, JSON.stringify(v)); } catch {} },
   };
-  const S = Object.assign({ rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto' }, store.get('settings', {}));
+  const S = Object.assign({ rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true }, store.get('settings', {}));
   for (const k of ['engine','apiKey','model','tone','glossary','target']) delete S[k];
   const save = () => store.set('settings', S);
   const T = () => LANGS.en;
@@ -360,7 +361,7 @@ textarea.input{min-height:80px;resize:vertical}
       fail(msg){ tr.className = 'tr err'; tr.textContent = '⚠ ' + msg; },
     };
   }
-  $('clearBtn').onclick = () => { welcome(); toast('대화를 지웠어요'); };
+  $('clearBtn').onclick = () => { welcome(); convo.length = 0; toast('대화를 지웠어요'); };
 
   /* ---------- big view ---------- */
   let bigData = null;
@@ -374,6 +375,31 @@ textarea.input{min-height:80px;resize:vertical}
   $('bigPlay').onclick = () => bigData && speak(bigData.text, bigData.tts);
 
   /* ---------- translation ---------- */
+  /* ---------- conversation context ----------
+     The free translator handles one text at a time, so we send the last few lines of the
+     conversation together with the new sentence (all written in the speaker's language),
+     then keep only the translation of the last line. Omitted subjects and short replies
+     ("네, 그거요", "거기서요") then read in the flow of the conversation. */
+  const convo = [];                 // { who, src, out, t }
+  const CTX_TURNS = 3, CTX_AGE = 5 * 60 * 1000;
+  const oneLine = t => t.replace(/\s*\n+\s*/g, ' ').trim();
+  function contextFor(from){
+    const now = Date.now();
+    return convo.filter(h => now - h.t < CTX_AGE).slice(-CTX_TURNS)
+      // show every earlier line in the current speaker's language: originals for their side, translations for the other side
+      .map(h => from === KO ? (h.who === 'me' ? h.src : h.out) : (h.who === 'me' ? h.out : h.src))
+      .filter(Boolean).map(oneLine);
+  }
+  async function translateInContext(text, from, to){
+    const ctx = S.ctxOn ? contextFor(from) : [];
+    if (!ctx.length) return translate(text, from, to);
+    try {
+      const out = await translate([...ctx, oneLine(text)].join('\n'), from, to);
+      const lines = out.split('\n').map(x => x.trim()).filter(Boolean);
+      if (lines.length === ctx.length + 1 && lines[lines.length - 1]) return lines[lines.length - 1];
+    } catch {}
+    return translate(text, from, to);   // line split didn't line up: fall back to the sentence on its own
+  }
   async function translate(text, from, to, signal){
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from.g}&tl=${to.g}&dt=t&q=${encodeURIComponent(text)}`;
     const r = await fetch(url, { signal });
@@ -518,11 +544,12 @@ textarea.input{min-height:80px;resize:vertical}
     $('liveSrc').textContent = '…'; $('liveDst').textContent = '';
     const { from, to } = pair(who);
     const turn = addTurn(who, text);
-    const job = translate(text, from, to).then(out => ({ out }), err => ({ err }));
+    // translate in order, so each sentence sees the one before it as context
     pipeline = pipeline.then(async () => {
-      const r = await job;
+      const r = await translateInContext(text, from, to).then(out => ({ out }), err => ({ err }));
       if (r.err) { turn.fail(r.err.message || '번역하지 못했어요'); return; }
       turn.set(r.out);
+      convo.push({ who, src: text, out: r.out, t: Date.now() }); if (convo.length > 20) convo.shift();
       // auto + speaker: hold the voice until the speaker pauses, so it never talks over them or gets picked up
       if (isAuto() && listening && S.echoGuard && !switching) held.push([r.out, to.tts]); else speak(r.out, to.tts);
     });
@@ -650,7 +677,7 @@ textarea.input{min-height:80px;resize:vertical}
   function fill(){
     $('rate').value = S.rate; $('rateVal').textContent = Number(S.rate).toFixed(1) + '×';
     $('gap').value = S.gap; $('gapVal').textContent = Number(S.gap).toFixed(1) + '초';
-    $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard;
+    $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard; $('ctxOn').checked = S.ctxOn;
     drawVoices();
   }
   $('openSettings').onclick = () => { fill(); dlg.showModal(); };
@@ -658,7 +685,7 @@ textarea.input{min-height:80px;resize:vertical}
   $('gap').oninput = () => { $('gapVal').textContent = Number($('gap').value).toFixed(1) + '초'; };
   $('rate').oninput = () => { $('rateVal').textContent = Number($('rate').value).toFixed(1) + '×'; };
   dlg.addEventListener('close', () => {
-    Object.assign(S, { rate: Number($('rate').value), gap: Number($('gap').value), liveOn: $('liveOn').checked, echoGuard: $('echoGuard').checked });
+    Object.assign(S, { rate: Number($('rate').value), gap: Number($('gap').value), liveOn: $('liveOn').checked, echoGuard: $('echoGuard').checked, ctxOn: $('ctxOn').checked });
     save();
   });
 
