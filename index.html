@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#f4f5fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11131b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="통역 비서">
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>내 통역 비서</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+/* Layout: mobile-only messenger-style one-screen app — top bar, Korean⇄English banner, chat bubbles, floating live card, thumb-zone mic dock */
+:root{
+  --bg:#f4f5fb; --surface:#ffffff; --surface-2:#eceef6; --ink:#141725; --muted:#6a7086; --line:#e2e5ef;
+  --brand:#3550e6; --brand-ink:#ffffff; --brand-soft:#e6eaff;
+  --rec:#ef4136; --ok:#13a374;
+    --shadow:0 6px 24px rgba(30,40,90,.10), 0 1px 3px rgba(30,40,90,.08);
+  --f:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#11131b; --surface:#1b1e2a; --surface-2:#252937; --ink:#eef0f7; --muted:#9aa0b6; --line:#2c3040;
+  --brand:#6f86ff; --brand-ink:#0d1030; --brand-soft:#262c4d;
+  --rec:#ff5a4f; --ok:#3fd19f;
+    --shadow:0 6px 24px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3);
+  color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--f);-webkit-tap-highlight-color:transparent;overflow:hidden;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+input,textarea{-webkit-user-select:text;user-select:text}
+.bubble .tr,.big-tr{-webkit-user-select:text;user-select:text}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+
+.app{height:var(--app-h,100dvh);max-width:480px;margin:0 auto;display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);position:relative}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:10px;padding-block:12px 4px}
+.logo{width:36px;height:36px;border-radius:11px;background:var(--brand);display:grid;place-items:center;color:var(--brand-ink);font-weight:800;font-size:15px;flex:none}
+.top h1{margin:0;font-size:18px;font-weight:750;letter-spacing:-.02em;flex:1}
+.ghost{width:44px;height:44px;border-radius:12px;border:0;background:transparent;display:grid;place-items:center;color:var(--muted)}
+.ghost:active{background:var(--surface-2)}
+.ghost svg{width:22px;height:22px}
+
+/* direction banner */
+.picker{padding-block:8px 6px}
+.pair{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;background:var(--surface);border-radius:18px;padding:12px 10px;box-shadow:0 1px 2px rgba(30,40,90,.06)}
+.side-lang{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:16px}
+.flagdot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;flex:none}
+.flagdot.ko{background:var(--brand)}.flagdot.en{background:var(--ok)}
+.swap{width:34px;height:34px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;color:var(--muted)}
+.swap svg{width:18px;height:18px}
+
+/* chat */
+.chat{flex:1;min-height:0;overflow-y:auto;padding-block:10px calc(var(--dock-h,170px) + 16px);overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+.row{display:flex;flex-direction:column;max-width:88%;min-width:0;animation:pop .22s ease-out}
+.row.me{align-self:flex-end;align-items:flex-end}
+.row.them{align-self:flex-start;align-items:flex-start}
+@keyframes pop{from{transform:translateY(6px);opacity:.4}}
+.who{font-size:12px;color:var(--muted);margin:0 6px 4px;font-weight:600}
+.bubble{border-radius:20px;padding:11px 15px 12px;display:grid;gap:6px;min-width:0;max-width:100%}
+.me .bubble{background:var(--brand);color:var(--brand-ink);border-bottom-right-radius:6px}
+.them .bubble{background:var(--surface);border-bottom-left-radius:6px;box-shadow:0 1px 2px rgba(30,40,90,.07)}
+.orig{font-size:14px;opacity:.78;overflow-wrap:anywhere;line-height:1.45}
+.tr{font-size:20px;font-weight:650;line-height:1.38;overflow-wrap:anywhere;letter-spacing:-.01em}
+.tr.wait{font-size:15px;font-weight:500;opacity:.75}
+.tr.err{font-size:14px;font-weight:500}
+.typing i{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;animation:blink 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes blink{50%{opacity:.2}}
+.acts{display:flex;gap:4px;margin-top:4px}
+.act{border:0;background:var(--surface);border-radius:999px;height:36px;padding:0 12px;display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--muted);box-shadow:0 1px 2px rgba(30,40,90,.06)}
+.act svg{width:15px;height:15px}
+.act:active{color:var(--ink);transform:scale(.96)}
+
+/* welcome */
+.welcome{background:var(--surface);border-radius:22px;padding:20px 18px;box-shadow:var(--shadow);display:grid;gap:14px;margin-top:6px}
+.welcome h2{margin:0;font-size:19px;letter-spacing:-.02em}
+.welcome p{margin:0;color:var(--muted);font-size:14px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.steps li{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;font-size:14.5px}
+.steps .n{width:34px;height:34px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:800}
+.tip{background:var(--surface-2);border-radius:14px;padding:10px 12px;font-size:13px;color:var(--muted)}
+
+/* live card */
+.live{position:absolute;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(var(--dock-h,130px) + 4px);
+  background:var(--surface);border-radius:20px;box-shadow:var(--shadow);padding:12px 16px 14px;display:grid;gap:4px;z-index:5;border:2px solid var(--rec)}
+.live.them-mode{border-color:var(--ok)}
+.live-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--rec)}
+.live.them-mode .live-head{color:var(--ok)}
+.bars{display:flex;gap:3px;align-items:center;height:16px}
+.bars i{width:3px;border-radius:2px;background:currentColor;height:30%;animation:eq 1s infinite ease-in-out}
+.bars i:nth-child(2){animation-delay:.2s}.bars i:nth-child(3){animation-delay:.4s}.bars i:nth-child(4){animation-delay:.1s}
+@keyframes eq{50%{height:100%}}
+.live-src{font-size:15px;color:var(--muted);overflow-wrap:anywhere;min-height:1.3em}
+.live-dst{font-size:18px;font-weight:650;overflow-wrap:anywhere}
+
+/* dock */
+.dock{position:absolute;left:0;right:0;bottom:0;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));padding-top:12px;
+  background:linear-gradient(to top,var(--bg) 70%,transparent);z-index:6}
+.dock-inner{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.side{display:grid;justify-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--muted);border:0;background:none;padding:0}
+.side .circ{width:54px;height:54px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow);display:grid;place-items:center;font-weight:800;font-size:20px;transition:transform .15s}
+.side:active .circ{transform:scale(.94)}
+.side .circ svg{width:24px;height:24px;color:var(--ink)}
+.side.on .circ{background:var(--ok);color:#fff}
+.mic{width:86px;height:86px;border-radius:50%;border:0;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;position:relative;
+  box-shadow:0 10px 26px color-mix(in srgb,var(--brand) 45%,transparent);transition:transform .15s,background .2s}
+.mic:active{transform:scale(.95)}
+.mic svg{width:36px;height:36px}
+.mic.on{background:var(--rec);box-shadow:0 10px 26px color-mix(in srgb,var(--rec) 45%,transparent)}
+.mic.on::before,.mic.on::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--rec);animation:ring 1.6s infinite ease-out}
+.mic.on::after{animation-delay:.8s}
+@keyframes ring{from{transform:scale(1);opacity:.6}to{transform:scale(1.55);opacity:0}}
+.mic-label{text-align:center;font-size:13px;font-weight:700;margin-top:8px;color:var(--ink)}
+.mic-wrap{display:grid;justify-items:center}
+.typebar{display:flex;gap:8px;margin-bottom:12px}
+.typebar input{flex:1;min-width:0;height:50px;font-size:16px!important;border-radius:14px;border:2px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;font:inherit}
+.typebar button{height:48px;border-radius:14px;border:0;background:var(--brand);color:var(--brand-ink);font-weight:700;padding:0 18px}
+
+/* big view */
+.big{position:fixed;inset:0;background:var(--surface);z-index:30;display:grid;grid-template-rows:auto 1fr auto;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px))}
+.big.flip .big-body{transform:rotate(180deg)}
+.big-top{display:flex;justify-content:space-between;align-items:center;font-weight:700;color:var(--muted);font-size:14px}
+.big-body{display:grid;align-content:center;gap:18px;text-align:center;transition:transform .3s}
+.big-tr{font-size:clamp(30px,8vw,52px);font-weight:750;line-height:1.3;overflow-wrap:anywhere;letter-spacing:-.02em}
+.big-orig{font-size:17px;color:var(--muted);overflow-wrap:anywhere}
+.big-acts{display:flex;gap:10px;justify-content:center}
+.pill{height:50px;border-radius:999px;border:0;padding:0 22px;font-weight:700;background:var(--surface-2);display:flex;align-items:center;gap:8px}
+.pill.primary{background:var(--brand);color:var(--brand-ink)}
+.pill svg{width:20px;height:20px}
+
+/* settings sheet */
+dialog{border:0;padding:0;margin:auto auto 0;width:100%;max-width:480px;max-height:88dvh;overscroll-behavior:contain;transition:transform .2s;border-radius:24px 24px 0 0;background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(10,12,25,.45)}
+.sheet{padding:10px max(20px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));display:grid;gap:18px}
+.grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto;box-shadow:0 0 0 14px transparent;touch-action:none}
+.sheet h2{margin:0;font-size:20px;letter-spacing:-.02em}
+.group{display:grid;gap:8px}
+.group > .lab{font-size:13px;font-weight:700;color:var(--muted)}
+.input{width:100%;border:2px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);padding:12px;font:inherit;font-size:16px}
+textarea.input{min-height:80px;resize:vertical}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.switch{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 14px;background:var(--bg);border-radius:14px}
+.switch span{font-size:14.5px;font-weight:600}.switch small{display:block;font-size:12px;color:var(--muted);font-weight:400;margin-top:2px}
+.switch input{appearance:none;width:48px;height:28px;border-radius:999px;background:var(--line);position:relative;flex:none;cursor:pointer;transition:background .2s}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.switch input:checked{background:var(--brand)}.switch input:checked::after{transform:translateX(20px)}
+.rate{display:flex;align-items:center;gap:12px}.rate input{flex:1;accent-color:var(--brand)}
+.rate b{min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.voices{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.voices div{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13px;display:flex;justify-content:space-between}
+.voices em{font-style:normal;font-weight:700}.voices .y{color:var(--ok)}.voices .n{color:var(--muted)}
+.danger{border:0;background:none;color:var(--rec);font-weight:700;padding:10px 0;text-align:left}
+.done{height:52px;border-radius:14px;border:0;background:var(--brand);color:var(--brand-ink);font-weight:750;font-size:16px}
+
+/* toast */
+.toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translate(-50%,-140%);background:var(--ink);color:var(--bg);
+  padding:11px 18px;border-radius:999px;font-size:14px;font-weight:600;z-index:40;transition:transform .3s;max-width:calc(100% - 32px);text-align:center}
+.toast.show{transform:translate(-50%,0)}
+
+.app.kb .picker,.app.kb .dock-inner{display:none}
+.app.kb .typebar{margin-bottom:0}
+.app.kb .top{padding-block:6px 2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top gut">
+    <div class="logo" aria-hidden="true">통</div>
+    <h1>내 통역 비서</h1>
+    <button class="ghost" id="clearBtn" type="button" aria-label="대화 지우기" title="대화 지우기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+    </button>
+    <button class="ghost" id="openSettings" type="button" aria-label="설정" title="설정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <section class="picker gut" aria-label="통역 언어">
+    <div class="pair">
+      <div class="side-lang"><span class="flagdot ko">KO</span>한국어</div>
+      <span class="swap" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15l-4-4M20 16H5l4 4"/></svg></span>
+      <div class="side-lang"><span class="flagdot en">EN</span>English</div>
+    </div>
+  </section>
+
+  <main class="chat gut" id="chat" aria-live="polite"></main>
+
+  <section class="live" id="live" hidden aria-live="polite">
+    <div class="live-head"><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="liveHead">듣고 있어요</span></div>
+    <div class="live-src" id="liveSrc">편하게 말씀하세요…</div>
+    <div class="live-dst" id="liveDst"></div>
+  </section>
+
+  <footer class="dock gut">
+    <form class="typebar" id="typeForm" hidden>
+      <input id="typeInput" placeholder="한국어로 입력하세요" autocomplete="off" enterkeyhint="send">
+      <button type="submit">통역</button>
+    </form>
+    <div class="dock-inner">
+      <button class="side" id="themBtn" type="button">
+        <span class="circ" id="themGlyph" style="color:var(--ok)">EN</span><span id="themLabel">영어 듣기</span>
+      </button>
+      <div class="mic-wrap">
+        <button class="mic" id="micBtn" type="button" aria-label="말하기 시작">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></svg>
+        </button>
+        <div class="mic-label" id="micLabel">눌러서 말하기</div>
+      </div>
+      <button class="side" id="kbBtn" type="button">
+        <span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></span><span>글자 입력</span>
+      </button>
+    </div>
+  </footer>
+</div>
+
+<div class="big" id="big" hidden role="dialog" aria-label="크게 보기">
+  <div class="big-top"><span id="bigLang">English</span><button class="ghost" id="bigClose" type="button" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="big-body"><div class="big-tr" id="bigTr"></div><div class="big-orig" id="bigOrig"></div></div>
+  <div class="big-acts">
+    <button class="pill" id="bigFlip" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>뒤집기</button>
+    <button class="pill primary" id="bigPlay" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>들려주기</button>
+  </div>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" class="sheet">
+    <div class="grab" aria-hidden="true"></div>
+    <h2>설정</h2>
+
+    <div class="group">
+      <span class="lab">통역 음성 속도</span>
+      <div class="rate"><span>느리게</span><input id="rate" type="range" min="0.6" max="1.6" step="0.1" value="1"><span>빠르게</span><b id="rateVal">1.0×</b></div>
+    </div>
+
+    <label class="switch"><span>실시간 미리보기<small>말하는 도중에도 번역을 미리 보여줘요</small></span><input type="checkbox" id="liveOn"></label>
+    <label class="switch"><span>에코 방지<small>통역 음성이 나오는 동안 마이크를 잠시 멈춰요. 이어폰을 쓰면 꺼도 돼요</small></span><input type="checkbox" id="echoGuard"></label>
+
+    <div class="group">
+      <span class="lab">이 기기의 음성</span>
+      <div class="voices" id="voiceList"></div>
+    </div>
+
+    <button class="done" value="ok">완료</button>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const LANGS = { en: { glyph:'EN', name:'영어', native:'English', stt:'en-US', tts:'en-US', g:'en' } };
+  const KO = { name:'한국어', native:'한국어', stt:'ko-KR', tts:'ko-KR', g:'ko' };
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem('interp.'+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v){ try { localStorage.setItem('interp.'+k, JSON.stringify(v)); } catch {} },
+  };
+  const S = Object.assign({ rate:1, liveOn:true, echoGuard:true }, store.get('settings', {}));
+  for (const k of ['engine','apiKey','model','tone','glossary','target']) delete S[k];
+  const save = () => store.set('settings', S);
+  const T = () => LANGS.en;
+
+  /* ---------- toast ---------- */
+  let toastTimer;
+  function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800); }
+
+
+  /* ---------- chat ---------- */
+  const chat = $('chat');
+  const ICON = {
+    play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>',
+    big:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+    copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  };
+  function welcome(){
+    chat.innerHTML = `
+      <section class="welcome">
+        <div><h2>안녕하세요! 무엇이든 말해보세요</h2><p>한국어로 말하면 영어로 바로 들려드려요.</p></div>
+        <ol class="steps">
+          <li><span class="n">1</span><span>파란 <b>마이크 버튼</b>을 누르고 한국어로 말해요</span></li>
+          <li><span class="n">2</span><span>문장이 끝날 때마다 <b>영어 음성</b>이 나와요</span></li>
+          <li><span class="n">3</span><span>상대방이 영어로 말할 땐 왼쪽 <b>영어 듣기</b>를 눌러요</span></li>
+        </ol>
+        <div class="tip">번역된 말풍선의 <b>크게 보기</b>를 누르면 화면 가득 영어 문장을 띄워 상대에게 보여줄 수 있어요.</div>
+      </section>`;
+  }
+  function addTurn(who, src){
+    chat.querySelector('.welcome')?.remove();
+    const from = who === 'me' ? KO : T(), to = who === 'me' ? T() : KO;
+    const row = document.createElement('div');
+    row.className = 'row ' + who;
+    row.innerHTML = `<div class="who"></div><div class="bubble"><div class="orig"></div><div class="tr wait"><span class="typing"><i></i><i></i><i></i></span>통역 중</div></div><div class="acts" hidden></div>`;
+    row.querySelector('.who').textContent = who === 'me' ? `나 · ${to.native}` : `상대방 · ${from.native}`;
+    row.querySelector('.orig').textContent = src;
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+    const tr = row.querySelector('.tr'), acts = row.querySelector('.acts');
+    return {
+      set(text){
+        tr.className = 'tr'; tr.textContent = text;
+        acts.hidden = false;
+        acts.innerHTML = `<button class="act" type="button" data-a="play">${ICON.play}다시 듣기</button><button class="act" type="button" data-a="big">${ICON.big}크게 보기</button><button class="act" type="button" data-a="copy">${ICON.copy}복사</button>`;
+        acts.onclick = e => {
+          const a = e.target.closest('button')?.dataset.a;
+          if (a === 'play') speak(text, to.tts);
+          if (a === 'big') openBig(text, src, to);
+          if (a === 'copy') navigator.clipboard?.writeText(text).then(() => toast('복사했어요'), () => toast('복사하지 못했어요'));
+        };
+        chat.scrollTop = chat.scrollHeight;
+      },
+      fail(msg){ tr.className = 'tr err'; tr.textContent = '⚠ ' + msg; },
+    };
+  }
+  $('clearBtn').onclick = () => { welcome(); toast('대화를 지웠어요'); };
+
+  /* ---------- big view ---------- */
+  let bigData = null;
+  function openBig(text, src, to){
+    bigData = { text, tts: to.tts };
+    $('bigTr').textContent = text; $('bigOrig').textContent = src; $('bigLang').textContent = to.native;
+    $('big').classList.remove('flip'); $('big').hidden = false;
+  }
+  $('bigClose').onclick = () => { $('big').hidden = true; };
+  $('bigFlip').onclick = () => $('big').classList.toggle('flip');
+  $('bigPlay').onclick = () => bigData && speak(bigData.text, bigData.tts);
+
+  /* ---------- translation ---------- */
+  async function translate(text, from, to, signal){
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from.g}&tl=${to.g}&dt=t&q=${encodeURIComponent(text)}`;
+    const r = await fetch(url, { signal });
+    if (!r.ok) throw new Error('번역 서버가 응답하지 않아요. 잠시 후 다시 해보세요');
+    const j = await r.json();
+    return (j[0] || []).map(x => x[0]).join('');
+  }
+
+  /* ---------- speech output ---------- */
+  const synth = window.speechSynthesis;
+  let voices = [];
+  function loadVoices(){ voices = synth ? synth.getVoices() : []; drawVoices(); }
+  if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
+  function pickVoice(tag){
+    const norm = v => v.lang.replace('_','-');
+    const list = voices.filter(v => norm(v).toLowerCase().startsWith(tag.slice(0,2).toLowerCase()));
+    return list.find(v => norm(v) === tag && /google|premium|enhanced|natural/i.test(v.name)) || list.find(v => norm(v) === tag) || list[0] || null;
+  }
+  function drawVoices(){
+    const box = $('voiceList'); if (!box) return; box.innerHTML = '';
+    for (const L of [...Object.values(LANGS), KO]) {
+      const ok = !!pickVoice(L.tts);
+      const d = document.createElement('div');
+      d.innerHTML = `<span>${L.name}</span><em class="${ok ? 'y' : 'n'}">${ok ? '기기 음성' : '온라인 음성'}</em>`;
+      box.appendChild(d);
+    }
+  }
+  let speaking = 0, audioBusy = false;
+  const audioQ = [];
+  function speakStart(){ speaking++; paint(); if (S.echoGuard && listening && rec) { pausedForTts = true; try { rec.abort(); } catch {} } }
+  function speakEnd(){ speaking = Math.max(0, speaking - 1); paint(); if (!speaking && pausedForTts) { pausedForTts = false; if (listening) startRec(); } }
+  function speak(text, tag){
+    if (!text) return;
+    const v = pickVoice(tag);
+    if (synth && v) {
+      const u = new SpeechSynthesisUtterance(text);
+      u.voice = v; u.lang = v.lang; u.rate = S.rate;
+      let started = false;
+      u.onstart = () => { started = true; speakStart(); };
+      u.onend = u.onerror = () => { if (started) { started = false; speakEnd(); } };
+      synth.speak(u);
+    } else {
+      for (const chunk of chunkText(text, 180)) audioQ.push({ chunk, tl: tag.slice(0,2) });
+      pumpAudio();
+    }
+  }
+  function chunkText(t, n){
+    const out = []; let cur = '';
+    for (const part of t.split(/(?<=[.!?。！？,，、\s])/)) { if ((cur + part).length > n && cur) { out.push(cur); cur = ''; } cur += part; }
+    if (cur.trim()) out.push(cur);
+    return out;
+  }
+  function pumpAudio(){
+    if (audioBusy || !audioQ.length) return;
+    audioBusy = true;
+    const { chunk, tl } = audioQ.shift();
+    const a = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${encodeURIComponent(chunk)}`);
+    a.playbackRate = S.rate;
+    speakStart();
+    const done = () => { speakEnd(); audioBusy = false; pumpAudio(); };
+    a.onended = done; a.onerror = done; a.play().catch(done);
+  }
+
+  /* ---------- speech input ---------- */
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, listening = false, mode = 'me', pausedForTts = false;
+  let liveCtl = null, liveTimer = null, liveSeq = 0;
+  const pair = m => m === 'me' ? { from: KO, to: T() } : { from: T(), to: KO };
+
+  function startRec(){
+    if (!SR) return;
+    const { from } = pair(mode);
+    rec = new SR();
+    rec.lang = from.stt; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+    rec.onresult = onResult;
+    rec.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { stopAll(); toast('마이크 권한을 허용해 주세요'); }
+      else if (e.error === 'language-not-supported') { stopAll(); toast(`이 기기는 ${from.name} 음성 인식을 지원하지 않아요`); }
+    };
+    rec.onend = () => { if (listening && !pausedForTts) { try { rec.start(); } catch { setTimeout(startRec, 150); } } };
+    try { rec.start(); } catch {}
+    paint();
+  }
+  function onResult(e){
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i], t = r[0].transcript.trim();
+      if (!t) continue;
+      if (r.isFinal) handleFinal(t); else interim += (interim ? ' ' : '') + t;
+    }
+    $('liveSrc').textContent = interim || (mode === 'me' ? '편하게 말씀하세요…' : '상대방이 말하면 바로 번역해요…');
+    if (interim) scheduleLive(interim); else $('liveDst').textContent = '';
+  }
+  function scheduleLive(text){
+    if (!S.liveOn) return;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(async () => {
+      const seq = ++liveSeq;
+      liveCtl?.abort(); liveCtl = new AbortController();
+      const { from, to } = pair(mode);
+      try { const out = await translate(text, from, to, liveCtl.signal); if (seq === liveSeq) $('liveDst').textContent = out; } catch {}
+    }, 250);
+  }
+  let pipeline = Promise.resolve();
+  function handleFinal(text, who = mode){
+    clearTimeout(liveTimer); liveSeq++; liveCtl?.abort();
+    $('liveSrc').textContent = '…'; $('liveDst').textContent = '';
+    const { from, to } = pair(who);
+    const turn = addTurn(who, text);
+    const job = translate(text, from, to).then(out => ({ out }), err => ({ err }));
+    pipeline = pipeline.then(async () => {
+      const r = await job;
+      if (r.err) { turn.fail(r.err.message || '번역하지 못했어요'); return; }
+      turn.set(r.out); speak(r.out, to.tts);
+    });
+  }
+  function restartFor(m){ mode = m; try { rec?.abort(); } catch {} rec = null; startRec(); }
+  function toggle(m){
+    if (!SR) { toast('이 브라우저는 음성 인식이 안 돼요. Chrome이나 Safari로 열어 주세요'); $('typeForm').hidden = false; return; }
+    if (listening && mode === m) { stopAll(); return; }
+    listening = true; pausedForTts = false;
+    $('typeForm').hidden = true;
+    restartFor(m); wake();
+  }
+  function stopAll(){
+    listening = false; pausedForTts = false;
+    try { rec?.stop(); } catch {} rec = null;
+    paint();
+  }
+
+  /* ---------- ui state ---------- */
+  function paint(){
+    const meOn = listening && mode === 'me', themOn = listening && mode === 'them';
+    $('micBtn').classList.toggle('on', meOn);
+    $('micBtn').setAttribute('aria-label', meOn ? '말하기 멈추기' : '말하기 시작');
+    $('micLabel').textContent = meOn ? '누르면 멈춰요' : '눌러서 말하기';
+    $('themBtn').classList.toggle('on', themOn);
+    $('themLabel').textContent = themOn ? '멈추기' : '영어 듣기';
+    const live = $('live');
+    live.hidden = !listening;
+    live.classList.toggle('them-mode', themOn);
+    if (listening) {
+      $('liveHead').textContent = speaking ? '통역 음성을 들려주는 중' :
+        (meOn ? `한국어를 듣고 있어요 → ${T().native}` : `${T().native}를 듣고 있어요 → 한국어`);
+      if (!$('liveSrc').textContent || $('liveSrc').textContent === '…') $('liveSrc').textContent = meOn ? '편하게 말씀하세요…' : '상대방이 말하면 바로 번역해요…';
+    }
+  }
+  $('micBtn').onclick = () => toggle('me');
+  $('themBtn').onclick = () => toggle('them');
+  $('kbBtn').onclick = () => { const f = $('typeForm'); f.hidden = !f.hidden; if (!f.hidden) { if (listening) stopAll(); $('typeInput').focus(); } };
+  $('typeForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('typeInput').value.trim(); if (!v) return;
+    $('typeInput').value = ''; handleFinal(v, 'me');
+  });
+
+  let lock = null;
+  async function wake(){ try { lock = await navigator.wakeLock?.request('screen'); } catch {} }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && listening) wake(); });
+
+  /* ---------- settings ---------- */
+  const dlg = $('settings'), form = dlg.querySelector('form');
+  function fill(){
+    $('rate').value = S.rate; $('rateVal').textContent = Number(S.rate).toFixed(1) + '×';
+    $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard;
+    drawVoices();
+  }
+  $('openSettings').onclick = () => { fill(); dlg.showModal(); };
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+  $('rate').oninput = () => { $('rateVal').textContent = Number($('rate').value).toFixed(1) + '×'; };
+  dlg.addEventListener('close', () => {
+    Object.assign(S, { rate: Number($('rate').value), liveOn: $('liveOn').checked, echoGuard: $('echoGuard').checked });
+    save();
+  });
+
+  /* ---------- mobile fit ---------- */
+  const root = document.documentElement, app = $('app'), dock = document.querySelector('.dock');
+  const vv = window.visualViewport;
+  let fullH = vv ? vv.height : innerHeight;
+  function fit(){
+    const h = vv ? vv.height : innerHeight;
+    root.style.setProperty('--app-h', h + 'px');
+    if (h > fullH) fullH = h;
+    const kbOpen = fullH - h > 140 && document.activeElement?.tagName === 'INPUT' && !$('typeForm').hidden;
+    app.classList.toggle('kb', kbOpen);
+    window.scrollTo(0, 0);
+    if (!chat.querySelector('.welcome')) chat.scrollTop = chat.scrollHeight;
+  }
+  vv?.addEventListener('resize', fit); vv?.addEventListener('scroll', () => window.scrollTo(0, 0));
+  addEventListener('orientationchange', () => { fullH = 0; setTimeout(fit, 300); });
+  new ResizeObserver(() => root.style.setProperty('--dock-h', dock.offsetHeight + 'px')).observe(dock);
+  $('typeInput').addEventListener('focus', () => setTimeout(fit, 250));
+  $('typeInput').addEventListener('blur', () => setTimeout(fit, 250));
+
+  // iOS/Android only allow sound after a tap: unlock speech + audio on the first touch of a talk button
+  let unlocked = false;
+  function unlockAudio(){
+    if (unlocked) return; unlocked = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth?.speak(u); } catch {}
+    try { const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='); a.play().catch(() => {}); } catch {}
+  }
+  const buzz = ms => { try { navigator.vibrate?.(ms); } catch {} };
+  for (const id of ['micBtn','themBtn','kbBtn','bigPlay']) $(id).addEventListener('click', () => { unlockAudio(); buzz(id === 'micBtn' || id === 'themBtn' ? 25 : 10); });
+
+  // swipe the settings sheet down to close it
+  (() => {
+    let y0 = null, dy = 0;
+    const grab = dlg.querySelector('.grab'), sheet = dlg;
+    grab.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; dy = 0; sheet.style.transition = 'none'; }, { passive:true });
+    grab.addEventListener('touchmove', e => { if (y0 === null) return; dy = Math.max(0, e.touches[0].clientY - y0); sheet.style.transform = `translateY(${dy}px)`; }, { passive:true });
+    grab.addEventListener('touchend', () => { sheet.style.transition = ''; sheet.style.transform = ''; if (dy > 90) dlg.close(); y0 = null; });
+  })();
+
+  // Android back button closes overlays instead of leaving the app
+  history.replaceState({ base:true }, '');
+  function pushLayer(){ history.pushState({ layer:true }, ''); }
+  addEventListener('popstate', () => {
+    if (!$('big').hidden) { $('big').hidden = true; return; }
+    if (dlg.open) { dlg.close(); return; }
+  });
+  $('openSettings').addEventListener('click', pushLayer);
+  new MutationObserver(() => { if (!$('big').hidden) pushLayer(); }).observe($('big'), { attributes:true, attributeFilter:['hidden'] });
+
+  // resume listening state cleanly when returning from another app
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && listening) stopAll(); });
+
+  /* ---------- boot ---------- */
+  fit(); welcome(); paint();
+  if (!SR) { $('typeForm').hidden = false; toast('이 브라우저는 음성 인식이 안 돼요. 글자 입력으로 통역할 수 있어요'); }
+})();
+</script>
+</body>
+</html>
