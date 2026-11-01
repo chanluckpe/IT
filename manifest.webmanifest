@@ -1,7 +1,7 @@
 {
   "name": "내 통역 비서",
   "short_name": "통역 비서",
-  "description": "한국어로 말하면 영어로 실시간 통역해 음성으로 들려주는 앱",
+  "description": "한국어로 말하면 영어·일본어·베트남어·태국어로 실시간 통역해 음성으로 들려주는 앱",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

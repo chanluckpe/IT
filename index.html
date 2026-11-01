@@ -16,11 +16,12 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
-/* Layout: mobile-only messenger-style one-screen app — top bar, Korean⇄English banner, chat bubbles, floating live card, thumb-zone mic dock */
+/* Layout: mobile-only messenger-style one-screen app — top bar, language settings, chat bubbles, floating live card, thumb-zone mic dock */
 :root{
   --bg:#f4f5fb; --surface:#ffffff; --surface-2:#eceef6; --ink:#141725; --muted:#6a7086; --line:#e2e5ef;
   --brand:#3550e6; --brand-ink:#ffffff; --brand-soft:#e6eaff;
   --rec:#ef4136; --ok:#13a374;
+  --c-en:#13a374; --c-ja:#e5486d; --c-vi:#d99400; --c-th:#7a4ee8;
     --shadow:0 6px 24px rgba(30,40,90,.10), 0 1px 3px rgba(30,40,90,.08);
   --f:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
   color-scheme:light;
@@ -29,6 +30,7 @@
   --bg:#11131b; --surface:#1b1e2a; --surface-2:#252937; --ink:#eef0f7; --muted:#9aa0b6; --line:#2c3040;
   --brand:#6f86ff; --brand-ink:#0d1030; --brand-soft:#262c4d;
   --rec:#ff5a4f; --ok:#3fd19f;
+  --c-en:#2fb98a; --c-ja:#f0668a; --c-vi:#e5a51f; --c-th:#9370f5;
     --shadow:0 6px 24px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3);
   color-scheme:dark}}
 *{box-sizing:border-box}
@@ -66,7 +68,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .modes button small{font-size:11px;font-weight:500}
 .modes button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(30,40,90,.14)}
 .flagdot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;flex:none}
-.flagdot.ko{background:var(--brand)}.flagdot.en{background:var(--ok)}
+.flagdot.ko{background:var(--brand)}.flagdot.en{background:var(--c-en)}.flagdot.ja{background:var(--c-ja)}.flagdot.vi{background:var(--c-vi)}.flagdot.th{background:var(--c-th)}
+.langs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.langs button{border:2px solid var(--line);background:var(--bg);border-radius:14px;padding:10px 2px 9px;display:grid;justify-items:center;gap:5px;line-height:1.15}
+.langs button b{font-size:13.5px}.langs button small{font-size:11px;color:var(--muted)}
+.langs button[aria-checked="true"]{border-color:var(--brand);background:var(--brand-soft)}
 .swap{width:34px;height:34px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;color:var(--muted)}
 .swap svg{width:18px;height:18px}
 
@@ -243,12 +249,13 @@ textarea.input{min-height:80px;resize:vertical}
     <h2>설정</h2>
 
     <div class="group">
-      <span class="lab">통역 언어</span>
+      <span class="lab">상대방 언어</span>
       <div class="pair">
         <div class="side-lang" id="sideKo"><span class="flagdot ko">KO</span>한국어</div>
         <span class="swap" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15l-4-4M20 16H5l4 4"/></svg></span>
-        <div class="side-lang en-side" id="sideEn"><span class="flagdot en">EN</span>English</div>
+        <div class="side-lang en-side" id="sideEn"><span class="flagdot en" id="pairDot">EN</span><span id="pairName">English</span></div>
       </div>
+      <div class="langs" role="radiogroup" aria-label="상대방 언어" id="langPick"></div>
     </div>
 
     <div class="group">
@@ -287,17 +294,23 @@ textarea.input{min-height:80px;resize:vertical}
 
 <script>
 (() => {
-  const LANGS = { en: { glyph:'EN', name:'영어', native:'English', stt:'en-US', tts:'en-US', g:'en' } };
+  const LANGS = {
+    en: { glyph:'EN', name:'영어',     native:'English',    stt:'en-US', tts:'en-US', g:'en', ask:'Please speak in English',  wait:"Go ahead, I'm listening…" },
+    ja: { glyph:'JA', name:'일본어',   native:'日本語',      stt:'ja-JP', tts:'ja-JP', g:'ja', ask:'日本語でどうぞ',            wait:'どうぞ、お話しください…' },
+    vi: { glyph:'VI', name:'베트남어', native:'Tiếng Việt', stt:'vi-VN', tts:'vi-VN', g:'vi', ask:'Mời bạn nói tiếng Việt',  wait:'Mời bạn nói…' },
+    th: { glyph:'TH', name:'태국어',   native:'ไทย',        stt:'th-TH', tts:'th-TH', g:'th', ask:'กรุณาพูดภาษาไทย',          wait:'เชิญพูดได้เลยค่ะ…' },
+  };
   const KO = { name:'한국어', native:'한국어', stt:'ko-KR', tts:'ko-KR', g:'ko' };
   const $ = id => document.getElementById(id);
   const store = {
     get(k, d){ try { const v = localStorage.getItem('interp.'+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v){ try { localStorage.setItem('interp.'+k, JSON.stringify(v)); } catch {} },
   };
-  const S = Object.assign({ rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true }, store.get('settings', {}));
-  for (const k of ['engine','apiKey','model','tone','glossary','target']) delete S[k];
+  const S = Object.assign({ target:'en', rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true }, store.get('settings', {}));
+  for (const k of ['engine','apiKey','model','tone','glossary']) delete S[k];
+  if (!['en','ja','vi','th'].includes(S.target)) S.target = 'en';
   const save = () => store.set('settings', S);
-  const T = () => LANGS.en;
+  const T = () => LANGS[S.target];
   const isAuto = () => S.convMode === 'auto';
 
   /* ---------- toast ---------- */
@@ -319,19 +332,19 @@ textarea.input{min-height:80px;resize:vertical}
   function welcome(){
     chat.innerHTML = `
       <section class="welcome">
-        <div><h2>안녕하세요! 무엇이든 말해보세요</h2><p>한국어로 말하면 영어로 바로 들려드려요.</p></div>
+        <div><h2>안녕하세요! 무엇이든 말해보세요</h2><p>한국어로 말하면 ${T().name}로 바로 들려드려요.</p></div>
         ${isAuto() ? `<ol class="steps">
           <li><span class="n">1</span><span><b>대화 시작</b>을 누르고 한국어로 말해요</span></li>
-          <li><span class="n">2</span><span>말을 멈추면 <b>영어 음성</b>이 나오고, 마이크가 자동으로 <b>영어 듣기</b>로 바뀌어요</span></li>
+          <li><span class="n">2</span><span>말을 멈추면 <b>${T().name} 음성</b>이 나오고, 마이크가 자동으로 <b>${T().name} 듣기</b>로 바뀌어요</span></li>
           <li><span class="n">3</span><span>상대방이 말을 마치면 한국어로 들려주고 다시 <b>내 차례</b>로 돌아와요</span></li>
         </ol>
-        <div class="tip">차례가 어긋나면 오른쪽 <b>차례 바꾸기</b>를 누르세요. 대화 중 아래 카드가 빨간색이면 내 차례, 초록색이면 상대방 차례예요. 대화 방식은 오른쪽 위 설정에서 바꿀 수 있어요.</div>`
+        <div class="tip">차례가 어긋나면 오른쪽 <b>차례 바꾸기</b>를 누르세요. 대화 중 아래 카드가 빨간색이면 내 차례, 초록색이면 상대방 차례예요. 상대방 언어와 대화 방식은 오른쪽 위 설정에서 바꿀 수 있어요.</div>`
         : `<ol class="steps">
           <li><span class="n">1</span><span>파란 <b>마이크 버튼</b>을 누르고 한국어로 말해요</span></li>
-          <li><span class="n">2</span><span>문장이 끝날 때마다 <b>영어 음성</b>이 나와요</span></li>
-          <li><span class="n">3</span><span>상대방이 영어로 말할 땐 오른쪽 <b>영어 듣기</b>를 눌러요</span></li>
+          <li><span class="n">2</span><span>문장이 끝날 때마다 <b>${T().name} 음성</b>이 나와요</span></li>
+          <li><span class="n">3</span><span>상대방이 ${T().name}로 말할 땐 오른쪽 <b>${T().name} 듣기</b>를 눌러요</span></li>
         </ol>
-        <div class="tip">번역된 말풍선의 <b>크게 보기</b>를 누르면 화면 가득 영어 문장을 띄워 상대에게 보여줄 수 있어요.</div>`}
+        <div class="tip">번역된 말풍선의 <b>크게 보기</b>를 누르면 화면 가득 ${T().name} 문장을 띄워 상대에게 보여줄 수 있어요.</div>`}
       </section>`;
   }
   function addTurn(who, src){
@@ -536,10 +549,10 @@ textarea.input{min-height:80px;resize:vertical}
     }, 250);
   }
   let pipeline = Promise.resolve();
-  const latinRatio = t => { const l = (t.match(/[A-Za-z]/g) || []).length, h = (t.match(/[가-힣]/g) || []).length; return l / Math.max(1, l + h); };
+  const foreignRatio = t => { const h = (t.match(/[가-힣]/g) || []).length, l = (t.match(/[A-Za-zÀ-ỹ\u3040-\u30ff\u4e00-\u9fff\u0e00-\u0e7f]/g) || []).length; return l / Math.max(1, l + h); };
   function handleFinal(text, who = mode){
-    // auto mode: English picked up while listening for Korean is treated as the partner speaking
-    if (isAuto() && who === 'me' && listening && latinRatio(text) > 0.6) who = 'them';
+    // auto mode: the partner's language picked up while listening for Korean is treated as the partner speaking
+    if (isAuto() && who === 'me' && listening && foreignRatio(text) > 0.6) who = 'them';
     clearTimeout(liveTimer); liveSeq++; liveCtl?.abort();
     $('liveSrc').textContent = '…'; $('liveDst').textContent = '';
     const { from, to } = pair(who);
@@ -590,7 +603,7 @@ textarea.input{min-height:80px;resize:vertical}
   }
   function placeholder(){
     if (switching) return '';
-    return mode === 'me' ? '편하게 말씀하세요…' : (isAuto() ? 'Go ahead, I\'m listening…' : '상대방이 말하면 바로 번역해요…');
+    return mode === 'me' ? '편하게 말씀하세요…' : (isAuto() ? T().wait : '상대방이 말하면 바로 번역해요…');
   }
   function restartFor(m){ mode = m; try { rec?.abort(); } catch {} rec = null; startRec(); }
   function toggle(m){
@@ -628,8 +641,8 @@ textarea.input{min-height:80px;resize:vertical}
       $('micBtn').setAttribute('aria-label', meOn ? '말하기 멈추기' : '말하기 시작');
       $('micLabel').textContent = meOn ? '누르면 멈춰요' : '눌러서 말하기';
       $('themBtn').classList.toggle('on', themOn);
-      $('themGlyph').textContent = 'EN';
-      $('themLabel').textContent = themOn ? '멈추기' : '영어 듣기';
+      $('themGlyph').textContent = T().glyph;
+      $('themLabel').textContent = themOn ? '멈추기' : `${T().name} 듣기`;
     }
     const live = $('live');
     const wasHidden = live.hidden;
@@ -640,8 +653,8 @@ textarea.input{min-height:80px;resize:vertical}
       let head;
       if (switching) head = speaking ? '통역 음성을 들려주는 중 · 곧 차례가 바뀌어요' : '통역하는 중…';
       else if (speaking) head = '통역 음성을 들려주는 중';
-      else if (auto) head = meOn ? '내 차례 · 한국어로 말하세요' : '상대방 차례 · Please speak in English';
-      else head = meOn ? '한국어를 듣고 있어요 → English' : 'English를 듣고 있어요 → 한국어';
+      else if (auto) head = meOn ? '내 차례 · 한국어로 말하세요' : `상대방 차례 · ${T().ask}`;
+      else head = meOn ? `한국어를 듣고 있어요 → ${T().native}` : `${T().name}를 듣고 있어요 → 한국어`;
       $('liveHead').textContent = head;
       const src = $('liveSrc').textContent;
       if (!src || src === '…' || /말씀하세요|번역해요|listening/.test(src)) $('liveSrc').textContent = placeholder();
@@ -653,6 +666,30 @@ textarea.input{min-height:80px;resize:vertical}
     if (listening) { if (!switching) endTurn(); }
     else { mode = mode === 'me' ? 'them' : 'me'; toast(mode === 'me' ? '내 차례부터 시작해요' : '상대방 차례부터 시작해요'); startAuto(); }
   };
+  function drawLangPick(){
+    const box = $('langPick'); box.innerHTML = '';
+    for (const [k, L] of Object.entries(LANGS)) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(k === S.target));
+      b.innerHTML = `<span class="flagdot ${k}">${L.glyph}</span><b>${L.name}</b><small>${L.native}</small>`;
+      b.onclick = () => {
+        if (S.target === k) return;
+        if (listening) stopAll();
+        S.target = k; save(); convo.length = 0; mode = 'me';
+        drawLangPick(); paintLang();
+        if (chat.querySelector('.welcome')) welcome();
+        toast(`이제 ${L.name}로 통역해요`);
+      };
+      box.appendChild(b);
+    }
+  }
+  function paintLang(){
+    const k = S.target;
+    $('pairDot').className = 'flagdot ' + k; $('pairDot').textContent = T().glyph;
+    $('pairName').textContent = T().native;
+    $('typeInput').placeholder = `한국어로 입력하면 ${T().name}로 통역해요`;
+    paint();
+  }
   for (const b of document.querySelectorAll('.modes button')) b.onclick = () => {
     if (S.convMode === b.dataset.mode) return;
     if (listening) stopAll();
@@ -741,7 +778,7 @@ textarea.input{min-height:80px;resize:vertical}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && listening) stopAll(); });
 
   /* ---------- boot ---------- */
-  fit(); welcome(); paint();
+  fit(); drawLangPick(); paintLang(); welcome();
   if (!SR) { $('typeForm').hidden = false; toast('이 브라우저는 음성 인식이 안 돼요. 글자 입력으로 통역할 수 있어요'); }
 })();
 </script>
