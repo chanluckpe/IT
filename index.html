@@ -66,7 +66,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sheet .modes button[aria-checked="true"] small{opacity:.85}
 .modes button{border:0;background:transparent;height:42px;border-radius:11px;font-weight:700;font-size:14.5px;color:var(--muted);display:grid;line-height:1.15;align-content:center}
 .modes button small{font-size:11px;font-weight:500}
-.modes.three{grid-template-columns:repeat(3,1fr)}
+.vbox{background:var(--bg);border-radius:16px;padding:12px;display:grid;gap:10px}
+.vhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.vhead b{font-size:15px}.vhead small{font-size:12.5px;color:var(--muted)}
+.vhead .fixed{margin-left:auto;font-size:12px;font-weight:700;color:var(--brand);background:var(--brand-soft);border-radius:999px;padding:3px 10px}
+.vsel{display:flex;gap:8px}.vsel .input{flex:1;min-width:0;background:var(--surface)}
+.pv{border:0;border-radius:12px;background:var(--brand);color:var(--brand-ink);font-weight:700;font-size:14px;padding:0 14px;white-space:nowrap}
+.vbox .modes{background:var(--surface-2)}
 .modes button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(30,40,90,.14)}
 .flagdot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;flex:none}
 .flagdot.ko{background:var(--brand)}.flagdot.en{background:var(--c-en)}.flagdot.ja{background:var(--c-ja)}.flagdot.vi{background:var(--c-vi)}.flagdot.th{background:var(--c-th)}
@@ -269,12 +275,20 @@ textarea.input{min-height:80px;resize:vertical}
 
     <div class="group">
       <span class="lab">통역 목소리</span>
-      <div class="modes three" role="radiogroup" aria-label="통역 목소리" id="genderPick">
-        <button type="button" role="radio" data-g="auto">자동<small>말한 사람 따라</small></button>
-        <button type="button" role="radio" data-g="female">여자<small>항상</small></button>
-        <button type="button" role="radio" data-g="male">남자<small>항상</small></button>
+      <div class="vbox">
+        <div class="vhead"><b>내 말</b><small id="myVoiceDir">한국어 → English</small><span class="fixed">남자 목소리</span></div>
+        <div class="vsel"><select class="input" id="myVoiceSel" aria-label="내 말 통역 목소리"></select><button type="button" class="pv" id="myPreview">미리 듣기</button></div>
+        <p class="hint" id="myVoiceHint" hidden></p>
       </div>
-      <p class="hint">자동은 말하는 사람의 목소리 높낮이로 남자·여자를 구분해서 통역 음성도 같은 성별로 들려줘요. 휴대폰에 남자 목소리가 없으면 음높이를 낮춰서 비슷하게 들려줘요.</p>
+      <div class="vbox">
+        <div class="vhead"><b>상대방 말</b><small id="themVoiceDir">English → 한국어</small></div>
+        <div class="modes" role="radiogroup" aria-label="상대방 말 목소리" id="partnerGender">
+          <button type="button" role="radio" data-g="female">여자 목소리</button>
+          <button type="button" role="radio" data-g="male">남자 목소리</button>
+        </div>
+        <div class="vsel"><select class="input" id="themVoiceSel" aria-label="상대방 말 통역 목소리"></select><button type="button" class="pv" id="themPreview">미리 듣기</button></div>
+        <p class="hint" id="themVoiceHint" hidden></p>
+      </div>
     </div>
 
     <div class="group">
@@ -317,9 +331,11 @@ textarea.input{min-height:80px;resize:vertical}
     get(k, d){ try { const v = localStorage.getItem('interp.'+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v){ try { localStorage.setItem('interp.'+k, JSON.stringify(v)); } catch {} },
   };
-  const S = Object.assign({ target:'en', rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true, voiceGender:'auto' }, store.get('settings', {}));
+  const S = Object.assign({ target:'en', rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true, partnerGender:'female', voiceChoice:{} }, store.get('settings', {}));
   for (const k of ['engine','apiKey','model','tone','glossary']) delete S[k];
   if (!['en','ja','vi','th'].includes(S.target)) S.target = 'en';
+  delete S.voiceGender;
+  if (typeof S.voiceChoice !== 'object' || !S.voiceChoice) S.voiceChoice = {};
   const save = () => store.set('settings', S);
   const T = () => LANGS[S.target];
   const isAuto = () => S.convMode === 'auto';
@@ -358,14 +374,13 @@ textarea.input{min-height:80px;resize:vertical}
         <div class="tip">번역된 말풍선의 <b>크게 보기</b>를 누르면 화면 가득 ${T().name} 문장을 띄워 상대에게 보여줄 수 있어요.</div>`}
       </section>`;
   }
-  const G_LABEL = { male:'남성 목소리', female:'여성 목소리' };
   function addTurn(who, src, gender){
     chat.querySelector('.welcome')?.remove();
     const from = who === 'me' ? KO : T(), to = who === 'me' ? T() : KO;
     const row = document.createElement('div');
     row.className = 'row ' + who;
     row.innerHTML = `<div class="who"></div><div class="bubble"><div class="orig"></div><div class="tr wait"><span class="typing"><i></i><i></i><i></i></span>통역 중</div></div><div class="acts" hidden></div>`;
-    row.querySelector('.who').textContent = (who === 'me' ? `나 · ${to.native}` : `상대방 · ${from.native}`) + (gender ? ` · ${G_LABEL[gender]}` : '');
+    row.querySelector('.who').textContent = (who === 'me' ? `나 · ${to.native}` : `상대방 · ${from.native}`) + '';
     row.querySelector('.orig').textContent = src;
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
@@ -436,29 +451,36 @@ textarea.input{min-height:80px;resize:vertical}
   /* ---------- speech output ---------- */
   const synth = window.speechSynthesis;
   let voices = [];
-  function loadVoices(){ voices = synth ? synth.getVoices() : []; drawVoices(); }
-  if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
-  // Browsers don't say which voices are male or female, so we go by well-known voice names
-  // (iPhone voices like Samantha/Daniel/Kyoko/Otoya, Android voice codes like en-us-x-iol).
-  const FEMALE_RX = /female|woman|samantha|karen|moira|tessa|fiona|victoria|\bava\b|allison|susan|zoe|nicky|kyoko|o-ren|yuna|sora|kanya|narisa|linh|shelley|sandy|\bflo\b|grandma|-iob-|-iog-|-sfg-|-tpc-|-tpf-|-htm-|-jab-|-ism-|-kob-/i;
-  const MALE_RX = /\bmale\b|\bman\b|\balex\b|aaron|arthur|daniel|\bfred\b|gordon|oliver|rishi|\btom\b|\breed\b|rocko|eddy|grandpa|ralph|albert|junior|otoya|hattori|minsu|-iol-|-iom-|-tpd-|-jac-|-jad-|-koc-|-kod-/i;
+  // Browsers don't label voices as male or female, so we go by well-known voice names
+  // (iPhone: Aaron, Daniel, Otoya, Minsu… / Android: en-us-x-iol…). Joke/robot voices are never picked automatically.
+  const FEMALE_RX = /female|woman|samantha|karen|moira|tessa|fiona|victoria|\bava\b|allison|susan|zoe|nicky|kyoko|o-ren|yuna|sora|kanya|narisa|linh|kathy|-iob-|-iog-|-sfg-|-tpc-|-tpf-|-htm-|-jab-|-ism-|-kob-/i;
+  const MALE_RX = /\bmale\b|\bman\b|aaron|daniel|arthur|gordon|oliver|rishi|\btom\b|\balex\b|evan|nathan|otoya|hattori|minsu|-iol-|-iom-|-tpd-|-jac-|-jad-|-koc-|-kod-/i;
+  const NOVELTY_RX = /bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|eddy|\bflo\b|grandma|grandpa|\breed\b|rocko|sandy|shelley|albert|\bfred\b|junior|ralph/i;
   const voiceGender = v => FEMALE_RX.test(v.name) ? 'female' : MALE_RX.test(v.name) ? 'male' : null;
+  function vnorm(v){ return v.lang.replace('_','-'); }
   function voicesFor(tag){
-    const norm = v => v.lang.replace('_','-');
-    const list = voices.filter(v => norm(v).toLowerCase().startsWith(tag.slice(0,2).toLowerCase()));
-    const score = v => (norm(v) === tag ? 2 : 0) + (/premium|enhanced|natural|neural|google/i.test(v.name) ? 1 : 0);
-    return list.sort((a, b) => score(b) - score(a));
+    const list = voices.filter(v => vnorm(v).toLowerCase().startsWith(tag.slice(0,2).toLowerCase()));
+    // same order the app used originally: exact region first, Google/premium voices first, otherwise the phone's own order
+    const score = v => (vnorm(v) === tag ? 2 : 0) + (/google|premium|enhanced|natural/i.test(v.name) ? 1 : 0);
+    return list.map((v, i) => [v, i]).sort((a, b) => score(b[0]) - score(a[0]) || a[1] - b[1]).map(x => x[0]);
   }
-  function pickVoice(tag, gender){
+  function autoVoice(tag, gender){
     const list = voicesFor(tag);
-    if (!list.length) return null;
-    if (gender) { const g = list.find(v => voiceGender(v) === gender); if (g) return { voice: g, pitch: 1 }; }
-    const base = list[0];
-    const baseG = voiceGender(base) || 'female';          // most phones' default voice is female
-    // no voice of the wanted gender on this phone: shift the pitch of the default voice instead
-    const pitch = gender && gender !== baseG ? (gender === 'male' ? 0.72 : 1.3) : 1;
-    return { voice: base, pitch };
+    const good = list.filter(v => !NOVELTY_RX.test(v.name));
+    return good.find(v => voiceGender(v) === gender)
+        // nothing named for that gender: take the phone's usual voice unless we know it's the other gender
+        || good.find(v => voiceGender(v) !== (gender === 'male' ? 'female' : 'male'))
+        || good[0] || list[0] || null;
   }
+  function loadVoices(){ voices = synth ? synth.getVoices() : []; drawVoices(); if (typeof drawVoicePickers === 'function' && $('settings').open) drawVoicePickers(); }
+  if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
+  const choiceKey = (tag, gender) => tag + '|' + gender;
+  function pickVoice(tag, gender){
+    const name = S.voiceChoice[choiceKey(tag, gender)];
+    return (name && voicesFor(tag).find(v => v.name === name)) || autoVoice(tag, gender);
+  }
+  // my words are always read by a male voice; the partner's words by the gender chosen in settings
+  const genderFor = who => who === 'me' ? 'male' : (S.partnerGender === 'male' ? 'male' : 'female');
   function drawVoices(){
     const box = $('voiceList'); if (!box) return; box.innerHTML = '';
     for (const L of [...Object.values(LANGS), KO]) {
@@ -474,17 +496,17 @@ textarea.input{min-height:80px;resize:vertical}
   function speakEnd(){ speaking = Math.max(0, speaking - 1); paint(); if (!speaking && pausedForTts && !switching) { pausedForTts = false; if (listening) startRec(); } }
   function speak(text, tag, gender){
     if (!text) return;
-    if (S.voiceGender !== 'auto') gender = S.voiceGender;
-    const pick = pickVoice(tag, gender);
-    if (synth && pick) {
+    gender = gender || 'male';
+    const v = pickVoice(tag, gender);
+    if (synth && v) {
       const u = new SpeechSynthesisUtterance(text);
-      u.voice = pick.voice; u.lang = pick.voice.lang; u.rate = S.rate; u.pitch = pick.pitch;
+      u.voice = v; u.lang = v.lang; u.rate = S.rate; u.pitch = 1;
       let started = false;
       u.onstart = () => { started = true; speakStart(); };
       u.onend = u.onerror = () => { if (started) { started = false; speakEnd(); } };
       synth.speak(u);
     } else {
-      for (const chunk of chunkText(text, 180)) audioQ.push({ chunk, tl: tag.slice(0,2), male: gender === 'male' });
+      for (const chunk of chunkText(text, 180)) audioQ.push({ chunk, tl: tag.slice(0,2) });
       pumpAudio();
     }
   }
@@ -497,86 +519,12 @@ textarea.input{min-height:80px;resize:vertical}
   function pumpAudio(){
     if (audioBusy || !audioQ.length) return;
     audioBusy = true;
-    const { chunk, tl, male } = audioQ.shift();
+    const { chunk, tl } = audioQ.shift();
     const a = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${encodeURIComponent(chunk)}`);
-    // the online voice is female only; for a male speaker play it slightly lower
-    if (male) { a.preservesPitch = false; a.webkitPreservesPitch = false; }
-    a.playbackRate = S.rate * (male ? 0.86 : 1);
+    a.playbackRate = S.rate;
     speakStart();
     const done = () => { speakEnd(); audioBusy = false; pumpAudio(); };
     a.onended = done; a.onerror = done; a.play().catch(done);
-  }
-
-  /* ---------- speaker gender from voice pitch ----------
-     While listening, a second, quiet tap on the microphone measures how high the voice is.
-     Typical speaking pitch: men ~85–155 Hz, women ~165–255 Hz. We take the median over the
-     sentence and split at 165 Hz. Samples are skipped while the app itself is talking. */
-  const pitch = { ctx:null, stream:null, an:null, buf:null, iv:null, samples:[], failed:false, empty:0, warned:false };
-  const lastGender = { me:null, them:null };
-  const pitchWanted = () => S.voiceGender === 'auto' && !pitch.failed && !!navigator.mediaDevices?.getUserMedia;
-  function pitchPrepare(){   // must run inside the tap, so the browser lets audio start
-    if (!pitchWanted()) return;
-    try { pitch.ctx ||= new (window.AudioContext || window.webkitAudioContext)(); pitch.ctx.resume?.(); } catch {}
-  }
-  async function pitchStart(){
-    if (!pitchWanted() || pitch.stream || !pitch.ctx) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } });
-      if (!listening || pitch.stream) { stream.getTracks().forEach(t => t.stop()); return; }
-      pitch.stream = stream;
-      await pitch.ctx.resume?.();
-      const src = pitch.ctx.createMediaStreamSource(stream);
-      pitch.an = pitch.ctx.createAnalyser(); pitch.an.fftSize = 2048; src.connect(pitch.an);
-      pitch.buf = new Float32Array(pitch.an.fftSize);
-      pitch.iv = setInterval(samplePitch, 60);
-    } catch { pitchOff('마이크 분석을 쓸 수 없어서 목소리 자동 맞춤을 껐어요'); }
-  }
-  function pitchStop(){
-    clearInterval(pitch.iv); pitch.iv = null; pitch.an = null;
-    pitch.stream?.getTracks().forEach(t => t.stop()); pitch.stream = null;
-  }
-  function pitchOff(msg){
-    pitch.failed = true; pitchStop();
-    if (!pitch.warned) { pitch.warned = true; toast(msg); }
-  }
-  function samplePitch(){
-    if (!pitch.an || speaking || switching || pausedForTts) return;
-    pitch.an.getFloatTimeDomainData(pitch.buf);
-    const f = detectPitch(pitch.buf, pitch.ctx.sampleRate);
-    if (f > 0) { pitch.samples.push(f); if (pitch.samples.length > 400) pitch.samples.shift(); }
-  }
-  function detectPitch(raw, sr){
-    // downsample to ~12 kHz, then normalised autocorrelation between 70 and 350 Hz
-    const D = Math.max(1, Math.round(sr / 12000)), n = Math.floor(raw.length / D), x = new Float32Array(n);
-    let mean = 0;
-    for (let i = 0; i < n; i++) { let v = 0; for (let j = 0; j < D; j++) v += raw[i * D + j]; x[i] = v / D; mean += x[i]; }
-    mean /= n; let rms = 0;
-    for (let i = 0; i < n; i++) { x[i] -= mean; rms += x[i] * x[i]; }
-    if (Math.sqrt(rms / n) < 0.008) return -1;          // silence
-    const fs = sr / D, minLag = Math.floor(fs / 350), maxLag = Math.min(n - 2, Math.ceil(fs / 70));
-    const corr = new Float32Array(maxLag + 2); let best = 0;
-    for (let lag = minLag; lag <= maxLag; lag++) {
-      let c = 0, e1 = 0, e2 = 0;
-      for (let i = 0; i < n - lag; i++) { const a = x[i], b = x[i + lag]; c += a * b; e1 += a * a; e2 += b * b; }
-      corr[lag] = c / Math.sqrt(e1 * e2 + 1e-12); if (corr[lag] > best) best = corr[lag];
-    }
-    if (best < 0.55) return -1;                          // not a voiced sound
-    // first strong peak = the real pitch (avoids picking half the frequency)
-    for (let lag = minLag + 1; lag < maxLag; lag++)
-      if (corr[lag] >= best * 0.88 && corr[lag] >= corr[lag - 1] && corr[lag] >= corr[lag + 1]) return fs / lag;
-    return -1;
-  }
-  function takeGender(who){
-    const s = pitch.samples.splice(0);
-    if (s.length >= 6) {
-      s.sort((a, b) => a - b);
-      lastGender[who] = s[s.length >> 1] < 165 ? 'male' : 'female';
-      pitch.empty = 0;
-    } else if (pitch.stream && listening && ++pitch.empty >= 3) {
-      // some phones hand the microphone only to speech recognition; the second tap then hears nothing
-      pitchOff('이 휴대폰에서는 목소리 성별 인식이 동작하지 않아요. 설정에서 남자/여자를 직접 고를 수 있어요');
-    }
-    return lastGender[who];
   }
 
   /* ---------- speech input ---------- */
@@ -593,12 +541,11 @@ textarea.input{min-height:80px;resize:vertical}
     if (!SR) return;
     const { from } = pair(mode);
     const me = rec = new SR();
-    utter = { finals:'', interim:'' }; clearTimeout(sentTimer); pitch.samples.length = 0;
+    utter = { finals:'', interim:'' }; clearTimeout(sentTimer);
     rec.lang = from.stt; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
     rec.onresult = e => { if (rec === me) onResult(e); };
     rec.onerror = e => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { stopAll(); toast('마이크 권한을 허용해 주세요'); }
-      else if (e.error === 'audio-capture' && pitch.stream) pitchOff('이 휴대폰은 목소리 분석과 음성 인식을 함께 쓸 수 없어서 목소리 자동 맞춤을 껐어요');
       else if (e.error === 'language-not-supported') { stopAll(); toast(`이 기기는 ${from.name} 음성 인식을 지원하지 않아요`); }
     };
     rec.onend = () => { if (listening && !pausedForTts && !switching && rec === me) { try { rec.start(); } catch { setTimeout(startRec, 150); } } };
@@ -660,7 +607,7 @@ textarea.input{min-height:80px;resize:vertical}
     clearTimeout(liveTimer); liveSeq++; liveCtl?.abort();
     $('liveSrc').textContent = '…'; $('liveDst').textContent = '';
     const { from, to } = pair(who);
-    const gender = S.voiceGender === 'auto' ? takeGender(who) : S.voiceGender;
+    const gender = genderFor(who);
     const turn = addTurn(who, text, gender);
     // translate in order, so each sentence sees the one before it as context
     pipeline = pipeline.then(async () => {
@@ -704,7 +651,7 @@ textarea.input{min-height:80px;resize:vertical}
     if (listening) { stopAll(); return; }
     listening = true; pausedForTts = false; switching = false; heardThisTurn = false; held = [];
     $('typeForm').hidden = true;
-    pitchPrepare(); restartFor(mode); wake(); pitchStart();
+    restartFor(mode); wake();
   }
   function placeholder(){
     if (switching) return '';
@@ -716,7 +663,7 @@ textarea.input{min-height:80px;resize:vertical}
     if (listening && mode === m) { stopAll(); return; }
     listening = true; pausedForTts = false;
     $('typeForm').hidden = true;
-    pitchPrepare(); restartFor(m); wake(); pitchStart();
+    restartFor(m); wake();
   }
   function stopAll(){
     listening = false; pausedForTts = false; switching = false; heardThisTurn = false;
@@ -725,7 +672,6 @@ textarea.input{min-height:80px;resize:vertical}
     if (pending) handleFinal(pending);
     for (const [t, tag, g] of held.splice(0)) speak(t, tag, g);
     try { rec?.stop(); } catch {} rec = null;
-    pitchStop();
     paint();
   }
 
@@ -734,7 +680,7 @@ textarea.input{min-height:80px;resize:vertical}
   function paint(){
     const auto = isAuto();
     const meOn = listening && mode === 'me', themOn = listening && mode === 'them';
-    for (const b of document.querySelectorAll('.modes button')) b.setAttribute('aria-checked', String(b.dataset.mode === S.convMode));
+    for (const b of document.querySelectorAll('.modes button[data-mode]')) b.setAttribute('aria-checked', String(b.dataset.mode === S.convMode));
     if (auto) {
       $('micBtn').classList.toggle('on', listening);
       $('micBtn').setAttribute('aria-label', listening ? '대화 끝내기' : '대화 시작');
@@ -782,7 +728,7 @@ textarea.input{min-height:80px;resize:vertical}
         if (S.target === k) return;
         if (listening) stopAll();
         S.target = k; save(); convo.length = 0; mode = 'me';
-        drawLangPick(); paintLang();
+        drawLangPick(); paintLang(); drawVoicePickers();
         if (chat.querySelector('.welcome')) welcome();
         toast(`이제 ${L.name}로 통역해요`);
       };
@@ -796,7 +742,7 @@ textarea.input{min-height:80px;resize:vertical}
     $('typeInput').placeholder = `한국어로 입력하면 ${T().name}로 통역해요`;
     paint();
   }
-  for (const b of document.querySelectorAll('.modes button')) b.onclick = () => {
+  for (const b of document.querySelectorAll('.modes button[data-mode]')) b.onclick = () => {
     if (S.convMode === b.dataset.mode) return;
     if (listening) stopAll();
     S.convMode = b.dataset.mode; save(); mode = 'me';
@@ -817,14 +763,38 @@ textarea.input{min-height:80px;resize:vertical}
 
   /* ---------- settings ---------- */
   const dlg = $('settings'), form = dlg.querySelector('form');
-  function paintGender(){ for (const b of document.querySelectorAll('#genderPick button')) b.setAttribute('aria-checked', String(b.dataset.g === S.voiceGender)); }
-  for (const b of document.querySelectorAll('#genderPick button')) b.onclick = () => {
-    S.voiceGender = b.dataset.g; save(); paintGender();
-    if (S.voiceGender === 'auto') { pitch.failed = false; pitch.warned = false; pitch.empty = 0; if (listening) { pitchPrepare(); pitchStart(); } }
-    else pitchStop();
-  };
+  const SAMPLE = { en:'Hello, nice to meet you.', ja:'こんにちは、はじめまして。', vi:'Xin chào, rất vui được gặp bạn.', th:'สวัสดีครับ ยินดีที่ได้รู้จักครับ', ko:'안녕하세요, 만나서 반갑습니다.' };
+  function fillVoiceSelect(sel, hint, tag, gender){
+    const list = voicesFor(tag), auto = autoVoice(tag, gender);
+    const label = v => v.name + (voiceGender(v) === 'male' ? ' · 남' : voiceGender(v) === 'female' ? ' · 여' : '');
+    sel.innerHTML = '';
+    const o0 = document.createElement('option'); o0.value = '';
+    o0.textContent = auto ? `자동 선택 (${label(auto)})` : '온라인 음성 (여자)';
+    sel.appendChild(o0);
+    for (const v of list) { const o = document.createElement('option'); o.value = v.name; o.textContent = label(v); sel.appendChild(o); }
+    sel.value = S.voiceChoice[choiceKey(tag, gender)] || '';
+    if (sel.value !== (S.voiceChoice[choiceKey(tag, gender)] || '')) sel.value = '';
+    sel.disabled = !list.length;
+    const anyOfGender = list.some(v => voiceGender(v) === gender && !NOVELTY_RX.test(v.name));
+    hint.hidden = list.length > 0 && anyOfGender;
+    hint.textContent = !list.length
+      ? '이 휴대폰에 이 언어의 기기 음성이 없어서 온라인 음성(여자)으로 나와요. 기기 음성을 설치하면 목소리를 고를 수 있어요.'
+      : `${gender === 'male' ? '남자' : '여자'} 목소리 이름을 찾지 못했어요. 목록에서 하나씩 미리 들어보고 맞는 목소리를 골라 주세요.`;
+    sel.onchange = () => { const k = choiceKey(tag, gender); if (sel.value) S.voiceChoice[k] = sel.value; else delete S.voiceChoice[k]; save(); };
+  }
+  function drawVoicePickers(){
+    const T_ = T();
+    $('myVoiceDir').textContent = `한국어 → ${T_.native}`;
+    $('themVoiceDir').textContent = `${T_.native} → 한국어`;
+    for (const b of document.querySelectorAll('#partnerGender button')) b.setAttribute('aria-checked', String(b.dataset.g === S.partnerGender));
+    fillVoiceSelect($('myVoiceSel'), $('myVoiceHint'), T_.tts, 'male');
+    fillVoiceSelect($('themVoiceSel'), $('themVoiceHint'), KO.tts, genderFor('them'));
+  }
+  for (const b of document.querySelectorAll('#partnerGender button')) b.onclick = () => { S.partnerGender = b.dataset.g; save(); drawVoicePickers(); };
+  $('myPreview').onclick = () => { unlockAudio(); speak(SAMPLE[S.target], T().tts, 'male'); };
+  $('themPreview').onclick = () => { unlockAudio(); speak(SAMPLE.ko, KO.tts, genderFor('them')); };
   function fill(){
-    paintGender();
+    drawVoicePickers();
     $('rate').value = S.rate; $('rateVal').textContent = Number(S.rate).toFixed(1) + '×';
     $('gap').value = S.gap; $('gapVal').textContent = Number(S.gap).toFixed(1) + '초';
     $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard; $('ctxOn').checked = S.ctxOn;
