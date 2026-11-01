@@ -66,6 +66,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sheet .modes button[aria-checked="true"] small{opacity:.85}
 .modes button{border:0;background:transparent;height:42px;border-radius:11px;font-weight:700;font-size:14.5px;color:var(--muted);display:grid;line-height:1.15;align-content:center}
 .modes button small{font-size:11px;font-weight:500}
+.modes.three{grid-template-columns:repeat(3,1fr)}
 .modes button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(30,40,90,.14)}
 .flagdot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;flex:none}
 .flagdot.ko{background:var(--brand)}.flagdot.en{background:var(--c-en)}.flagdot.ja{background:var(--c-ja)}.flagdot.vi{background:var(--c-vi)}.flagdot.th{background:var(--c-th)}
@@ -267,6 +268,16 @@ textarea.input{min-height:80px;resize:vertical}
     </div>
 
     <div class="group">
+      <span class="lab">통역 목소리</span>
+      <div class="modes three" role="radiogroup" aria-label="통역 목소리" id="genderPick">
+        <button type="button" role="radio" data-g="auto">자동<small>말한 사람 따라</small></button>
+        <button type="button" role="radio" data-g="female">여자<small>항상</small></button>
+        <button type="button" role="radio" data-g="male">남자<small>항상</small></button>
+      </div>
+      <p class="hint">자동은 말하는 사람의 목소리 높낮이로 남자·여자를 구분해서 통역 음성도 같은 성별로 들려줘요. 휴대폰에 남자 목소리가 없으면 음높이를 낮춰서 비슷하게 들려줘요.</p>
+    </div>
+
+    <div class="group">
       <span class="lab">통역 음성 속도</span>
       <div class="rate"><span>느리게</span><input id="rate" type="range" min="0.6" max="1.6" step="0.1" value="1"><span>빠르게</span><b id="rateVal">1.0×</b></div>
     </div>
@@ -306,7 +317,7 @@ textarea.input{min-height:80px;resize:vertical}
     get(k, d){ try { const v = localStorage.getItem('interp.'+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v){ try { localStorage.setItem('interp.'+k, JSON.stringify(v)); } catch {} },
   };
-  const S = Object.assign({ target:'en', rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true }, store.get('settings', {}));
+  const S = Object.assign({ target:'en', rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true, voiceGender:'auto' }, store.get('settings', {}));
   for (const k of ['engine','apiKey','model','tone','glossary']) delete S[k];
   if (!['en','ja','vi','th'].includes(S.target)) S.target = 'en';
   const save = () => store.set('settings', S);
@@ -347,13 +358,14 @@ textarea.input{min-height:80px;resize:vertical}
         <div class="tip">번역된 말풍선의 <b>크게 보기</b>를 누르면 화면 가득 ${T().name} 문장을 띄워 상대에게 보여줄 수 있어요.</div>`}
       </section>`;
   }
-  function addTurn(who, src){
+  const G_LABEL = { male:'남성 목소리', female:'여성 목소리' };
+  function addTurn(who, src, gender){
     chat.querySelector('.welcome')?.remove();
     const from = who === 'me' ? KO : T(), to = who === 'me' ? T() : KO;
     const row = document.createElement('div');
     row.className = 'row ' + who;
     row.innerHTML = `<div class="who"></div><div class="bubble"><div class="orig"></div><div class="tr wait"><span class="typing"><i></i><i></i><i></i></span>통역 중</div></div><div class="acts" hidden></div>`;
-    row.querySelector('.who').textContent = who === 'me' ? `나 · ${to.native}` : `상대방 · ${from.native}`;
+    row.querySelector('.who').textContent = (who === 'me' ? `나 · ${to.native}` : `상대방 · ${from.native}`) + (gender ? ` · ${G_LABEL[gender]}` : '');
     row.querySelector('.orig').textContent = src;
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
@@ -365,8 +377,8 @@ textarea.input{min-height:80px;resize:vertical}
         acts.innerHTML = `<button class="act" type="button" data-a="play">${ICON.play}다시 듣기</button><button class="act" type="button" data-a="big">${ICON.big}크게 보기</button><button class="act" type="button" data-a="copy">${ICON.copy}복사</button>`;
         acts.onclick = e => {
           const a = e.target.closest('button')?.dataset.a;
-          if (a === 'play') speak(text, to.tts);
-          if (a === 'big') openBig(text, src, to);
+          if (a === 'play') speak(text, to.tts, gender);
+          if (a === 'big') openBig(text, src, to, gender);
           if (a === 'copy') navigator.clipboard?.writeText(text).then(() => toast('복사했어요'), () => toast('복사하지 못했어요'));
         };
         chat.scrollTop = chat.scrollHeight;
@@ -378,14 +390,14 @@ textarea.input{min-height:80px;resize:vertical}
 
   /* ---------- big view ---------- */
   let bigData = null;
-  function openBig(text, src, to){
-    bigData = { text, tts: to.tts };
+  function openBig(text, src, to, gender){
+    bigData = { text, tts: to.tts, gender };
     $('bigTr').textContent = text; $('bigOrig').textContent = src; $('bigLang').textContent = to.native;
     $('big').classList.remove('flip'); $('big').hidden = false;
   }
   $('bigClose').onclick = () => { $('big').hidden = true; };
   $('bigFlip').onclick = () => $('big').classList.toggle('flip');
-  $('bigPlay').onclick = () => bigData && speak(bigData.text, bigData.tts);
+  $('bigPlay').onclick = () => bigData && speak(bigData.text, bigData.tts, bigData.gender);
 
   /* ---------- translation ---------- */
   /* ---------- conversation context ----------
@@ -426,15 +438,31 @@ textarea.input{min-height:80px;resize:vertical}
   let voices = [];
   function loadVoices(){ voices = synth ? synth.getVoices() : []; drawVoices(); }
   if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
-  function pickVoice(tag){
+  // Browsers don't say which voices are male or female, so we go by well-known voice names
+  // (iPhone voices like Samantha/Daniel/Kyoko/Otoya, Android voice codes like en-us-x-iol).
+  const FEMALE_RX = /female|woman|samantha|karen|moira|tessa|fiona|victoria|\bava\b|allison|susan|zoe|nicky|kyoko|o-ren|yuna|sora|kanya|narisa|linh|shelley|sandy|\bflo\b|grandma|-iob-|-iog-|-sfg-|-tpc-|-tpf-|-htm-|-jab-|-ism-|-kob-/i;
+  const MALE_RX = /\bmale\b|\bman\b|\balex\b|aaron|arthur|daniel|\bfred\b|gordon|oliver|rishi|\btom\b|\breed\b|rocko|eddy|grandpa|ralph|albert|junior|otoya|hattori|minsu|-iol-|-iom-|-tpd-|-jac-|-jad-|-koc-|-kod-/i;
+  const voiceGender = v => FEMALE_RX.test(v.name) ? 'female' : MALE_RX.test(v.name) ? 'male' : null;
+  function voicesFor(tag){
     const norm = v => v.lang.replace('_','-');
     const list = voices.filter(v => norm(v).toLowerCase().startsWith(tag.slice(0,2).toLowerCase()));
-    return list.find(v => norm(v) === tag && /google|premium|enhanced|natural/i.test(v.name)) || list.find(v => norm(v) === tag) || list[0] || null;
+    const score = v => (norm(v) === tag ? 2 : 0) + (/premium|enhanced|natural|neural|google/i.test(v.name) ? 1 : 0);
+    return list.sort((a, b) => score(b) - score(a));
+  }
+  function pickVoice(tag, gender){
+    const list = voicesFor(tag);
+    if (!list.length) return null;
+    if (gender) { const g = list.find(v => voiceGender(v) === gender); if (g) return { voice: g, pitch: 1 }; }
+    const base = list[0];
+    const baseG = voiceGender(base) || 'female';          // most phones' default voice is female
+    // no voice of the wanted gender on this phone: shift the pitch of the default voice instead
+    const pitch = gender && gender !== baseG ? (gender === 'male' ? 0.72 : 1.3) : 1;
+    return { voice: base, pitch };
   }
   function drawVoices(){
     const box = $('voiceList'); if (!box) return; box.innerHTML = '';
     for (const L of [...Object.values(LANGS), KO]) {
-      const ok = !!pickVoice(L.tts);
+      const ok = voicesFor(L.tts).length > 0;
       const d = document.createElement('div');
       d.innerHTML = `<span>${L.name}</span><em class="${ok ? 'y' : 'n'}">${ok ? '기기 음성' : '온라인 음성'}</em>`;
       box.appendChild(d);
@@ -444,18 +472,19 @@ textarea.input{min-height:80px;resize:vertical}
   const audioQ = [];
   function speakStart(){ speaking++; paint(); if (S.echoGuard && listening && rec && !switching) { pausedForTts = true; try { rec.abort(); } catch {} } }
   function speakEnd(){ speaking = Math.max(0, speaking - 1); paint(); if (!speaking && pausedForTts && !switching) { pausedForTts = false; if (listening) startRec(); } }
-  function speak(text, tag){
+  function speak(text, tag, gender){
     if (!text) return;
-    const v = pickVoice(tag);
-    if (synth && v) {
+    if (S.voiceGender !== 'auto') gender = S.voiceGender;
+    const pick = pickVoice(tag, gender);
+    if (synth && pick) {
       const u = new SpeechSynthesisUtterance(text);
-      u.voice = v; u.lang = v.lang; u.rate = S.rate;
+      u.voice = pick.voice; u.lang = pick.voice.lang; u.rate = S.rate; u.pitch = pick.pitch;
       let started = false;
       u.onstart = () => { started = true; speakStart(); };
       u.onend = u.onerror = () => { if (started) { started = false; speakEnd(); } };
       synth.speak(u);
     } else {
-      for (const chunk of chunkText(text, 180)) audioQ.push({ chunk, tl: tag.slice(0,2) });
+      for (const chunk of chunkText(text, 180)) audioQ.push({ chunk, tl: tag.slice(0,2), male: gender === 'male' });
       pumpAudio();
     }
   }
@@ -468,12 +497,86 @@ textarea.input{min-height:80px;resize:vertical}
   function pumpAudio(){
     if (audioBusy || !audioQ.length) return;
     audioBusy = true;
-    const { chunk, tl } = audioQ.shift();
+    const { chunk, tl, male } = audioQ.shift();
     const a = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${encodeURIComponent(chunk)}`);
-    a.playbackRate = S.rate;
+    // the online voice is female only; for a male speaker play it slightly lower
+    if (male) { a.preservesPitch = false; a.webkitPreservesPitch = false; }
+    a.playbackRate = S.rate * (male ? 0.86 : 1);
     speakStart();
     const done = () => { speakEnd(); audioBusy = false; pumpAudio(); };
     a.onended = done; a.onerror = done; a.play().catch(done);
+  }
+
+  /* ---------- speaker gender from voice pitch ----------
+     While listening, a second, quiet tap on the microphone measures how high the voice is.
+     Typical speaking pitch: men ~85–155 Hz, women ~165–255 Hz. We take the median over the
+     sentence and split at 165 Hz. Samples are skipped while the app itself is talking. */
+  const pitch = { ctx:null, stream:null, an:null, buf:null, iv:null, samples:[], failed:false, empty:0, warned:false };
+  const lastGender = { me:null, them:null };
+  const pitchWanted = () => S.voiceGender === 'auto' && !pitch.failed && !!navigator.mediaDevices?.getUserMedia;
+  function pitchPrepare(){   // must run inside the tap, so the browser lets audio start
+    if (!pitchWanted()) return;
+    try { pitch.ctx ||= new (window.AudioContext || window.webkitAudioContext)(); pitch.ctx.resume?.(); } catch {}
+  }
+  async function pitchStart(){
+    if (!pitchWanted() || pitch.stream || !pitch.ctx) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } });
+      if (!listening || pitch.stream) { stream.getTracks().forEach(t => t.stop()); return; }
+      pitch.stream = stream;
+      await pitch.ctx.resume?.();
+      const src = pitch.ctx.createMediaStreamSource(stream);
+      pitch.an = pitch.ctx.createAnalyser(); pitch.an.fftSize = 2048; src.connect(pitch.an);
+      pitch.buf = new Float32Array(pitch.an.fftSize);
+      pitch.iv = setInterval(samplePitch, 60);
+    } catch { pitchOff('마이크 분석을 쓸 수 없어서 목소리 자동 맞춤을 껐어요'); }
+  }
+  function pitchStop(){
+    clearInterval(pitch.iv); pitch.iv = null; pitch.an = null;
+    pitch.stream?.getTracks().forEach(t => t.stop()); pitch.stream = null;
+  }
+  function pitchOff(msg){
+    pitch.failed = true; pitchStop();
+    if (!pitch.warned) { pitch.warned = true; toast(msg); }
+  }
+  function samplePitch(){
+    if (!pitch.an || speaking || switching || pausedForTts) return;
+    pitch.an.getFloatTimeDomainData(pitch.buf);
+    const f = detectPitch(pitch.buf, pitch.ctx.sampleRate);
+    if (f > 0) { pitch.samples.push(f); if (pitch.samples.length > 400) pitch.samples.shift(); }
+  }
+  function detectPitch(raw, sr){
+    // downsample to ~12 kHz, then normalised autocorrelation between 70 and 350 Hz
+    const D = Math.max(1, Math.round(sr / 12000)), n = Math.floor(raw.length / D), x = new Float32Array(n);
+    let mean = 0;
+    for (let i = 0; i < n; i++) { let v = 0; for (let j = 0; j < D; j++) v += raw[i * D + j]; x[i] = v / D; mean += x[i]; }
+    mean /= n; let rms = 0;
+    for (let i = 0; i < n; i++) { x[i] -= mean; rms += x[i] * x[i]; }
+    if (Math.sqrt(rms / n) < 0.008) return -1;          // silence
+    const fs = sr / D, minLag = Math.floor(fs / 350), maxLag = Math.min(n - 2, Math.ceil(fs / 70));
+    const corr = new Float32Array(maxLag + 2); let best = 0;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let c = 0, e1 = 0, e2 = 0;
+      for (let i = 0; i < n - lag; i++) { const a = x[i], b = x[i + lag]; c += a * b; e1 += a * a; e2 += b * b; }
+      corr[lag] = c / Math.sqrt(e1 * e2 + 1e-12); if (corr[lag] > best) best = corr[lag];
+    }
+    if (best < 0.55) return -1;                          // not a voiced sound
+    // first strong peak = the real pitch (avoids picking half the frequency)
+    for (let lag = minLag + 1; lag < maxLag; lag++)
+      if (corr[lag] >= best * 0.88 && corr[lag] >= corr[lag - 1] && corr[lag] >= corr[lag + 1]) return fs / lag;
+    return -1;
+  }
+  function takeGender(who){
+    const s = pitch.samples.splice(0);
+    if (s.length >= 6) {
+      s.sort((a, b) => a - b);
+      lastGender[who] = s[s.length >> 1] < 165 ? 'male' : 'female';
+      pitch.empty = 0;
+    } else if (pitch.stream && listening && ++pitch.empty >= 3) {
+      // some phones hand the microphone only to speech recognition; the second tap then hears nothing
+      pitchOff('이 휴대폰에서는 목소리 성별 인식이 동작하지 않아요. 설정에서 남자/여자를 직접 고를 수 있어요');
+    }
+    return lastGender[who];
   }
 
   /* ---------- speech input ---------- */
@@ -490,11 +593,12 @@ textarea.input{min-height:80px;resize:vertical}
     if (!SR) return;
     const { from } = pair(mode);
     const me = rec = new SR();
-    utter = { finals:'', interim:'' }; clearTimeout(sentTimer);
+    utter = { finals:'', interim:'' }; clearTimeout(sentTimer); pitch.samples.length = 0;
     rec.lang = from.stt; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
     rec.onresult = e => { if (rec === me) onResult(e); };
     rec.onerror = e => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { stopAll(); toast('마이크 권한을 허용해 주세요'); }
+      else if (e.error === 'audio-capture' && pitch.stream) pitchOff('이 휴대폰은 목소리 분석과 음성 인식을 함께 쓸 수 없어서 목소리 자동 맞춤을 껐어요');
       else if (e.error === 'language-not-supported') { stopAll(); toast(`이 기기는 ${from.name} 음성 인식을 지원하지 않아요`); }
     };
     rec.onend = () => { if (listening && !pausedForTts && !switching && rec === me) { try { rec.start(); } catch { setTimeout(startRec, 150); } } };
@@ -556,7 +660,8 @@ textarea.input{min-height:80px;resize:vertical}
     clearTimeout(liveTimer); liveSeq++; liveCtl?.abort();
     $('liveSrc').textContent = '…'; $('liveDst').textContent = '';
     const { from, to } = pair(who);
-    const turn = addTurn(who, text);
+    const gender = S.voiceGender === 'auto' ? takeGender(who) : S.voiceGender;
+    const turn = addTurn(who, text, gender);
     // translate in order, so each sentence sees the one before it as context
     pipeline = pipeline.then(async () => {
       const r = await translateInContext(text, from, to).then(out => ({ out }), err => ({ err }));
@@ -564,7 +669,7 @@ textarea.input{min-height:80px;resize:vertical}
       turn.set(r.out);
       convo.push({ who, src: text, out: r.out, t: Date.now() }); if (convo.length > 20) convo.shift();
       // auto + speaker: hold the voice until the speaker pauses, so it never talks over them or gets picked up
-      if (isAuto() && listening && S.echoGuard && !switching) held.push([r.out, to.tts]); else speak(r.out, to.tts);
+      if (isAuto() && listening && S.echoGuard && !switching) held.push([r.out, to.tts, gender]); else speak(r.out, to.tts, gender);
     });
   }
   function whenIdle(){
@@ -586,7 +691,7 @@ textarea.input{min-height:80px;resize:vertical}
     $('liveSrc').textContent = ''; $('liveDst').textContent = '';
     paint();
     await pipeline;
-    for (const [t, tag] of held.splice(0)) speak(t, tag);
+    for (const [t, tag, g] of held.splice(0)) speak(t, tag, g);
     await whenIdle();
     switching = false; pausedForTts = false;
     if (!listening || !isAuto()) { paint(); return; }
@@ -599,7 +704,7 @@ textarea.input{min-height:80px;resize:vertical}
     if (listening) { stopAll(); return; }
     listening = true; pausedForTts = false; switching = false; heardThisTurn = false; held = [];
     $('typeForm').hidden = true;
-    restartFor(mode); wake();
+    pitchPrepare(); restartFor(mode); wake(); pitchStart();
   }
   function placeholder(){
     if (switching) return '';
@@ -611,15 +716,16 @@ textarea.input{min-height:80px;resize:vertical}
     if (listening && mode === m) { stopAll(); return; }
     listening = true; pausedForTts = false;
     $('typeForm').hidden = true;
-    restartFor(m); wake();
+    pitchPrepare(); restartFor(m); wake(); pitchStart();
   }
   function stopAll(){
     listening = false; pausedForTts = false; switching = false; heardThisTurn = false;
     clearTimeout(turnTimer);
     const pending = takeUtter();
     if (pending) handleFinal(pending);
-    for (const [t, tag] of held.splice(0)) speak(t, tag);
+    for (const [t, tag, g] of held.splice(0)) speak(t, tag, g);
     try { rec?.stop(); } catch {} rec = null;
+    pitchStop();
     paint();
   }
 
@@ -711,7 +817,14 @@ textarea.input{min-height:80px;resize:vertical}
 
   /* ---------- settings ---------- */
   const dlg = $('settings'), form = dlg.querySelector('form');
+  function paintGender(){ for (const b of document.querySelectorAll('#genderPick button')) b.setAttribute('aria-checked', String(b.dataset.g === S.voiceGender)); }
+  for (const b of document.querySelectorAll('#genderPick button')) b.onclick = () => {
+    S.voiceGender = b.dataset.g; save(); paintGender();
+    if (S.voiceGender === 'auto') { pitch.failed = false; pitch.warned = false; pitch.empty = 0; if (listening) { pitchPrepare(); pitchStart(); } }
+    else pitchStop();
+  };
   function fill(){
+    paintGender();
     $('rate').value = S.rate; $('rateVal').textContent = Number(S.rate).toFixed(1) + '×';
     $('gap').value = S.gap; $('gapVal').textContent = Number(S.gap).toFixed(1) + '초';
     $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard; $('ctxOn').checked = S.ctxOn;
