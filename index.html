@@ -223,8 +223,8 @@ textarea.input{min-height:80px;resize:vertical}
       <button type="submit">통역</button>
     </form>
     <div class="dock-inner">
-      <button class="side" id="themBtn" type="button">
-        <span class="circ" id="themGlyph" style="color:var(--ok)">EN</span><span id="themLabel">영어 듣기</span>
+      <button class="side" id="kbBtn" type="button">
+        <span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></span><span>글자 입력</span>
       </button>
       <div class="mic-wrap">
         <button class="mic" id="micBtn" type="button" aria-label="말하기 시작">
@@ -232,8 +232,8 @@ textarea.input{min-height:80px;resize:vertical}
         </button>
         <div class="mic-label" id="micLabel">눌러서 말하기</div>
       </div>
-      <button class="side" id="kbBtn" type="button">
-        <span class="circ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></span><span>글자 입력</span>
+      <button class="side" id="themBtn" type="button">
+        <span class="circ" id="themGlyph" style="color:var(--ok)">EN</span><span id="themLabel">영어 듣기</span>
       </button>
     </div>
   </footer>
@@ -314,11 +314,11 @@ textarea.input{min-height:80px;resize:vertical}
           <li><span class="n">2</span><span>말을 멈추면 <b>영어 음성</b>이 나오고, 마이크가 자동으로 <b>영어 듣기</b>로 바뀌어요</span></li>
           <li><span class="n">3</span><span>상대방이 말을 마치면 한국어로 들려주고 다시 <b>내 차례</b>로 돌아와요</span></li>
         </ol>
-        <div class="tip">차례가 어긋나면 왼쪽 <b>차례 바꾸기</b>를 누르세요. 위쪽에 빨간 테두리(나) 또는 초록 테두리(상대방)로 지금 누구 차례인지 보여줘요.</div>`
+        <div class="tip">차례가 어긋나면 오른쪽 <b>차례 바꾸기</b>를 누르세요. 위쪽에 빨간 테두리(나) 또는 초록 테두리(상대방)로 지금 누구 차례인지 보여줘요.</div>`
         : `<ol class="steps">
           <li><span class="n">1</span><span>파란 <b>마이크 버튼</b>을 누르고 한국어로 말해요</span></li>
           <li><span class="n">2</span><span>문장이 끝날 때마다 <b>영어 음성</b>이 나와요</span></li>
-          <li><span class="n">3</span><span>상대방이 영어로 말할 땐 왼쪽 <b>영어 듣기</b>를 눌러요</span></li>
+          <li><span class="n">3</span><span>상대방이 영어로 말할 땐 오른쪽 <b>영어 듣기</b>를 눌러요</span></li>
         </ol>
         <div class="tip">번역된 말풍선의 <b>크게 보기</b>를 누르면 화면 가득 영어 문장을 띄워 상대에게 보여줄 수 있어요.</div>`}
       </section>`;
