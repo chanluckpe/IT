@@ -187,6 +187,47 @@ textarea.input{min-height:80px;resize:vertical}
 .danger{border:0;background:none;color:var(--rec);font-weight:700;padding:10px 0;text-align:left}
 .done{height:52px;border-radius:14px;border:0;background:var(--brand);color:var(--brand-ink);font-weight:750;font-size:16px}
 
+/* photo translation (camera) — always dark, like a camera app */
+.cam{position:fixed;inset:0;z-index:35;background:#000;color:#fff;display:grid;grid-template-rows:auto 1fr auto;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);touch-action:manipulation}
+.cam-top{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;padding:6px max(8px,env(safe-area-inset-right,0px)) 6px max(8px,env(safe-area-inset-left,0px))}
+.cam-top h2{margin:0;text-align:center;font-size:15px;font-weight:700;line-height:1.25}
+.cam-top h2 small{display:block;font-size:12px;font-weight:500;color:#b9bdcc}
+.cam-ic{width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center}
+.cam-ic svg{width:22px;height:22px}
+.cam-ic[aria-pressed="true"]{background:#ffd23f;color:#111}
+.cam-stage{position:relative;min-height:0;overflow:hidden}
+.cam-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111}
+.cam-frame{position:absolute;inset:12% 7% 18%;border-radius:18px;pointer-events:none;
+  box-shadow:0 0 0 2px rgba(255,255,255,.75),0 0 0 9999px rgba(0,0,0,.28)}
+.cam-guide{position:absolute;left:16px;right:16px;bottom:5%;text-align:center;font-size:14px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+.cam-msg{position:absolute;inset:0;display:grid;place-content:center;gap:10px;text-align:center;padding:24px;color:#d6d9e4;font-size:15px}
+.cam-msg b{color:#fff;font-size:17px}
+.cam-result{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#0d0f15}
+.cam-result canvas{display:block;width:100%;height:auto;margin:0 auto}
+.cam-result.zoom canvas{width:220%;max-width:none}
+.cam-list{padding:14px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));display:grid;gap:8px;background:#0d0f15}
+.cam-list h3{margin:4px 0 2px;font-size:13px;color:#9ea3b5;font-weight:700}
+.cam-item{background:#1a1d27;border-radius:14px;padding:10px 12px;display:grid;gap:2px;min-width:0}
+.cam-item .o{font-size:13px;color:#9ea3b5;overflow-wrap:anywhere}
+.cam-item .k{font-size:17px;font-weight:650;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
+.cam-busy{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:14px;background:rgba(0,0,0,.62);text-align:center;padding:24px}
+.cam-busy b{font-size:16px}.cam-busy small{font-size:12.5px;color:#c6c9d6}
+.spin{width:44px;height:44px;border-radius:50%;border:4px solid rgba(255,255,255,.2);border-top-color:#fff;animation:spin 0.9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cam-bar{width:200px;height:6px;border-radius:3px;background:rgba(255,255,255,.2);overflow:hidden}
+.cam-bar i{display:block;height:100%;width:0;background:#fff;transition:width .2s}
+.cam-bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:14px max(16px,env(safe-area-inset-right,0px)) 18px max(16px,env(safe-area-inset-left,0px))}
+.cam-side{display:grid;justify-items:center;gap:4px;border:0;background:none;color:#fff;font-size:12px;font-weight:600;padding:0}
+.cam-side .cam-ic{width:50px;height:50px}
+.shutter{width:76px;height:76px;border-radius:50%;border:5px solid #fff;background:#fff;box-shadow:inset 0 0 0 4px #000;transition:transform .1s}
+.shutter:active{transform:scale(.92)}
+.cam-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+.cam-actions button{height:52px;border:0;border-radius:14px;background:#252937;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
+.cam-actions button svg{width:18px;height:18px}
+.cam-actions button.primary{background:#3550e6}
+.cam-actions button[aria-pressed="true"]{background:#ffd23f;color:#111}
+
 /* toast */
 .toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translate(-50%,-140%);background:var(--ink);color:var(--bg);
   padding:11px 18px;border-radius:999px;font-size:14px;font-weight:600;z-index:40;transition:transform .3s;max-width:calc(100% - 32px);text-align:center}
@@ -205,6 +246,9 @@ textarea.input{min-height:80px;resize:vertical}
     <h1>내 통역 비서</h1>
     <button class="ghost" id="clearBtn" type="button" aria-label="대화 지우기" title="대화 지우기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+    </button>
+    <button class="ghost" id="camBtn" type="button" aria-label="사진 번역" title="사진 번역">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
     </button>
     <button class="ghost" id="openSettings" type="button" aria-label="설정" title="설정">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -248,6 +292,36 @@ textarea.input{min-height:80px;resize:vertical}
     <button class="pill" id="bigFlip" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>뒤집기</button>
     <button class="pill primary" id="bigPlay" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>들려주기</button>
   </div>
+</div>
+
+<div class="cam" id="cam" hidden role="dialog" aria-label="사진 번역">
+  <div class="cam-top">
+    <button class="cam-ic" id="camClose" type="button" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2>사진 번역<small id="camSub">English → 한국어</small></h2>
+    <button class="cam-ic" id="camTorch" type="button" aria-label="플래시" aria-pressed="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
+  </div>
+  <div class="cam-stage">
+    <video id="camVideo" playsinline muted autoplay></video>
+    <div class="cam-frame" id="camFrame" aria-hidden="true"></div>
+    <div class="cam-guide" id="camGuide">메뉴판이나 글자가 네모 안에 꽉 차게 찍어 주세요</div>
+    <div class="cam-msg" id="camMsg" hidden></div>
+    <div class="cam-result" id="camResult" hidden>
+      <canvas id="camCanvas"></canvas>
+      <div class="cam-list" id="camList"></div>
+    </div>
+    <div class="cam-busy" id="camBusy" hidden><div class="spin" aria-hidden="true"></div><b id="camBusyText">글자를 읽는 중…</b><div class="cam-bar"><i id="camBarFill"></i></div><small id="camBusySub"></small></div>
+  </div>
+  <div class="cam-bottom" id="camShootBar">
+    <button class="cam-side" id="camGallery" type="button"><span class="cam-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg></span>앨범</button>
+    <button class="shutter" id="camShutter" type="button" aria-label="찍기"></button>
+    <span></span>
+  </div>
+  <div class="cam-actions" id="camResultBar" hidden>
+    <button type="button" id="camRetake"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>다시 찍기</button>
+    <button type="button" id="camOrig" aria-pressed="false">원문 보기</button>
+    <button type="button" id="camZoom" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5M11 8v6M8 11h6"/></svg>확대</button>
+  </div>
+  <input type="file" id="camFile" accept="image/*" hidden>
 </div>
 
 <dialog id="settings">
@@ -853,10 +927,287 @@ textarea.input{min-height:80px;resize:vertical}
     grab.addEventListener('touchend', () => { sheet.style.transition = ''; sheet.style.transform = ''; if (dy > 90) dlg.close(); y0 = null; });
   })();
 
+  /* ---------- photo translation ----------
+     Camera → text recognition in the phone (Tesseract, loaded on first use, language data
+     cached after the first download) → each line translated to Korean → the Korean is
+     painted over the original text, on the photo itself. */
+  const OCR_LANG = { en:'eng', ja:'jpn', vi:'vie', th:'tha' };
+  const cam = { stream:null, track:null, img:null, imgData:null, segs:[], worker:null, workerLangs:'', workerReady:null, lib:null, busy:false, progress:null };
+  const ocrLangs = () => S.target === 'en' ? 'eng' : OCR_LANG[S.target] + '+eng';
+  function loadOcrLib(){
+    if (window.Tesseract) return Promise.resolve();
+    return cam.lib ||= new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+      sc.onload = res; sc.onerror = () => { cam.lib = null; rej(new Error('lib')); };
+      document.head.appendChild(sc);
+    });
+  }
+  function getWorker(){
+    const langs = ocrLangs();
+    if (cam.worker && cam.workerLangs === langs) return cam.workerReady;
+    const old = cam.worker; cam.worker = null; old?.terminate?.().catch?.(() => {});
+    cam.workerLangs = langs;
+    const p = cam.workerReady = (async () => {
+      await loadOcrLib();
+      const w = await Tesseract.createWorker(langs, 1, { logger: m => cam.progress?.(m) });
+      if (cam.workerReady === p) cam.worker = w; else w.terminate();
+      return w;
+    })();
+    p.catch(() => { if (cam.workerReady === p) { cam.workerReady = null; cam.workerLangs = ''; } });
+    return p;
+  }
+
+  function camView(view){   // 'shoot' | 'busy' | 'result' | 'msg'
+    const shoot = view === 'shoot';
+    $('camVideo').hidden = !shoot; $('camFrame').hidden = !shoot; $('camGuide').hidden = !shoot;
+    $('camShootBar').hidden = !shoot && view !== 'msg';
+    $('camResult').hidden = view !== 'result';
+    $('camResultBar').hidden = view !== 'result';
+    $('camBusy').hidden = view !== 'busy';
+    $('camMsg').hidden = view !== 'msg';
+    $('camTorch').hidden = !shoot || !cam.track?.getCapabilities?.().torch;
+  }
+  function camMessage(title, body){
+    $('camMsg').innerHTML = '<b></b><span></span>';
+    $('camMsg').querySelector('b').textContent = title;
+    $('camMsg').querySelector('span').textContent = body;
+    camView('msg');
+  }
+  function busy(text, sub, pct){
+    $('camBusyText').textContent = text; $('camBusySub').textContent = sub || '';
+    $('camBarFill').style.width = Math.round((pct || 0) * 100) + '%';
+  }
+
+  async function startCamera(){
+    stopCamera();
+    camView('shoot');
+    if (!navigator.mediaDevices?.getUserMedia) { camMessage('카메라를 쓸 수 없어요', '아래 셔터를 누르면 휴대폰 카메라 앱으로 찍을 수 있어요.'); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:false,
+        video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1440 } } });
+      if ($('cam').hidden) { stream.getTracks().forEach(t => t.stop()); return; }
+      cam.stream = stream; cam.track = stream.getVideoTracks()[0];
+      $('camVideo').srcObject = stream;
+      await $('camVideo').play().catch(() => {});
+      $('camTorch').setAttribute('aria-pressed', 'false');
+      camView('shoot');
+    } catch (e) {
+      camMessage('카메라 권한이 필요해요', '브라우저 설정에서 카메라를 허용하거나, 아래 셔터를 눌러 휴대폰 카메라 앱으로 찍어 주세요.');
+    }
+  }
+  function stopCamera(){
+    cam.stream?.getTracks().forEach(t => t.stop());
+    cam.stream = null; cam.track = null;
+    try { $('camVideo').srcObject = null; } catch {}
+  }
+  function openCam(){
+    if (listening) stopAll();
+    $('camSub').textContent = `${T().native} → 한국어`;
+    $('cam').hidden = false; pushLayer();
+    startCamera();
+    getWorker().catch(() => {});   // start downloading the reader while the person frames the shot
+  }
+  function closeCam(){
+    stopCamera(); $('cam').hidden = true;
+    $('camResult').classList.remove('zoom'); $('camZoom').setAttribute('aria-pressed', 'false');
+  }
+  $('camBtn').onclick = () => { buzz(10); openCam(); };
+  $('camClose').onclick = () => { if (history.state?.layer) history.back(); else closeCam(); };
+  $('camTorch').onclick = async () => {
+    const on = $('camTorch').getAttribute('aria-pressed') !== 'true';
+    try { await cam.track.applyConstraints({ advanced:[{ torch:on }] }); $('camTorch').setAttribute('aria-pressed', String(on)); } catch {}
+  };
+  $('camShutter').onclick = () => {
+    buzz(15);
+    const v = $('camVideo');
+    if (cam.stream && v.videoWidth) {
+      const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+      c.getContext('2d').drawImage(v, 0, 0);
+      stopCamera();
+      processImage(c);
+    } else { $('camFile').setAttribute('capture', 'environment'); $('camFile').click(); }
+  };
+  $('camGallery').onclick = () => { $('camFile').removeAttribute('capture'); $('camFile').click(); };
+  $('camFile').onchange = () => {
+    const f = $('camFile').files[0]; $('camFile').value = '';
+    if (!f) return;
+    const im = new Image(), url = URL.createObjectURL(f);
+    im.onload = () => { URL.revokeObjectURL(url); stopCamera(); processImage(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); toast('사진을 열 수 없어요'); };
+    im.src = url;
+  };
+  $('camRetake').onclick = () => { $('camResult').classList.remove('zoom'); $('camZoom').setAttribute('aria-pressed', 'false'); startCamera(); };
+  $('camOrig').onclick = () => {
+    const on = $('camOrig').getAttribute('aria-pressed') !== 'true';
+    $('camOrig').setAttribute('aria-pressed', String(on)); $('camOrig').textContent = on ? '번역 보기' : '원문 보기';
+    drawPhoto(!on);
+  };
+  $('camZoom').onclick = () => {
+    const on = !$('camResult').classList.contains('zoom');
+    $('camResult').classList.toggle('zoom', on); $('camZoom').setAttribute('aria-pressed', String(on));
+  };
+  document.addEventListener('visibilitychange', () => {
+    if ($('cam').hidden) return;
+    if (document.visibilityState === 'hidden') stopCamera();
+    else if (!$('camVideo').hidden) startCamera();
+  });
+
+  // ---- recognise + translate
+  const CJK_THAI = '\\u3040-\\u30ff\\u3400-\\u9fff\\uff00-\\uffef\\u0e00-\\u0e7f';
+  const joinTight = t => t.replace(new RegExp(`(?<=[${CJK_THAI}])\\s+(?=[${CJK_THAI}])`, 'g'), '');
+  function segmentsFrom(data){
+    const lines = data.lines?.length ? data.lines : (data.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(p => p.lines || []));
+    const out = [];
+    for (const l of lines) {
+      const words = (l.words || []).filter(w => w.text.trim());
+      if (!words.length) continue;
+      const h = l.bbox.y1 - l.bbox.y0;
+      let cur = [words[0]];
+      const flush = () => {
+        const b = { x0:Math.min(...cur.map(w => w.bbox.x0)), y0:Math.min(...cur.map(w => w.bbox.y0)), x1:Math.max(...cur.map(w => w.bbox.x1)), y1:Math.max(...cur.map(w => w.bbox.y1)) };
+        const text = joinTight(cur.map(w => w.text).join(' ')).trim();
+        const conf = cur.reduce((a, w) => a + w.confidence, 0) / cur.length;
+        out.push({ text, bbox:b, conf, lineH:h });
+      };
+      // a wide gap splits a line into separate items (e.g. dish name … price)
+      for (let i = 1; i < words.length; i++) {
+        const gap = words[i].bbox.x0 - words[i - 1].bbox.x1;
+        if (gap > Math.max(h * 1.6, 24)) { flush(); cur = [words[i]]; } else cur.push(words[i]);
+      }
+      flush();
+    }
+    return out.filter(sg => {
+      const letters = (sg.text.match(/\p{L}/gu) || []).length;
+      if (!letters) return false;                                   // prices, numbers, symbols stay as printed
+      if (sg.conf < 45 || (sg.conf < 70 && letters <= 2)) return false;  // noise
+      if ((sg.text.match(/[가-힣]/g) || []).length > letters / 2) return false;  // already Korean
+      return true;
+    });
+  }
+  async function translateAll(texts){
+    const out = new Array(texts.length).fill('');
+    const AUTO = { g:'auto' };
+    // send many lines per request (keeps menu context); fall back to one by one if the lines don't line up
+    for (let i = 0; i < texts.length;) {
+      let j = i, len = 0;
+      while (j < texts.length && (j === i || len + texts[j].length < 900)) { len += texts[j].length + 1; j++; }
+      const chunk = texts.slice(i, j).map(t => t.replace(/\n/g, ' '));
+      let lines = null;
+      try {
+        const r = await translate(chunk.join('\n'), AUTO, KO);
+        const l = r.split('\n').map(x => x.trim());
+        if (l.length === chunk.length) lines = l;
+      } catch {}
+      if (!lines) lines = await Promise.all(chunk.map(t => translate(t, AUTO, KO).catch(() => '')));
+      lines.forEach((t, k) => out[i + k] = t);
+      i = j;
+    }
+    return out;
+  }
+  async function processImage(src){
+    if (cam.busy) return; cam.busy = true;
+    try {
+      // working copy: at most 2000px on the long side
+      const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+      const k = Math.min(1, 2000 / Math.max(sw, sh));
+      const c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+      const cx = c.getContext('2d'); cx.drawImage(src, 0, 0, c.width, c.height);
+      cam.img = c; cam.imgData = cx.getImageData(0, 0, c.width, c.height); cam.segs = [];
+      camView('busy'); busy('글자 인식 준비 중…', '처음 한 번만 인식 데이터(1~3MB)를 내려받아요', 0.05);
+      cam.progress = m => {
+        if (m.status === 'recognizing text') busy('글자를 읽는 중…', '', 0.15 + 0.65 * m.progress);
+        else if (/loading|initializ/.test(m.status)) busy('글자 인식 준비 중…', '처음 한 번만 인식 데이터(1~3MB)를 내려받아요', 0.05 + 0.1 * (m.progress || 0));
+      };
+      let worker;
+      try { worker = await getWorker(); }
+      catch { camMessage('글자 인식을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 찍어 주세요. 처음 한 번은 인터넷이 필요해요.'); return; }
+      const { data } = await worker.recognize(c);
+      const segs = segmentsFrom(data);
+      if (!segs.length) { camMessage('글자를 찾지 못했어요', '글자가 크게 나오도록 더 가까이, 밝은 곳에서 흔들리지 않게 찍어 주세요.'); return; }
+      busy('한국어로 번역하는 중…', '', 0.85);
+      const ko = await translateAll(segs.map(sg => sg.text));
+      segs.forEach((sg, i) => sg.ko = ko[i]);
+      cam.segs = segs.filter(sg => sg.ko && sg.ko.replace(/\s/g, '') !== sg.text.replace(/\s/g, ''));
+      if (!cam.segs.length) { camMessage('번역하지 못했어요', '인터넷 연결을 확인하고 다시 찍어 주세요.'); return; }
+      $('camOrig').setAttribute('aria-pressed', 'false'); $('camOrig').textContent = '원문 보기';
+      drawPhoto(true); drawList();
+      camView('result'); $('camResult').scrollTop = 0;
+    } catch (e) {
+      camMessage('사진을 번역하지 못했어요', '다시 찍어 주세요.');
+    } finally { cam.busy = false; cam.progress = null; }
+  }
+
+  // ---- paint Korean over the photo
+  function bgAround(b, pad){
+    const { width:W, height:H, data } = cam.imgData, rs = [], gs = [], bs = [];
+    const x0 = Math.max(0, b.x0 - pad), x1 = Math.min(W - 1, b.x1 + pad), y0 = Math.max(0, b.y0 - pad), y1 = Math.min(H - 1, b.y1 + pad);
+    const take = (x, y) => { const i = (y * W + x) * 4; rs.push(data[i]); gs.push(data[i + 1]); bs.push(data[i + 2]); };
+    const stepX = Math.max(1, (x1 - x0) >> 5), stepY = Math.max(1, (y1 - y0) >> 3);
+    for (let x = x0; x <= x1; x += stepX) { take(x, y0); take(x, y1); }
+    for (let y = y0; y <= y1; y += stepY) { take(x0, y); take(x1, y); }
+    const med = a => a.sort((p, q) => p - q)[a.length >> 1];
+    return [med(rs), med(gs), med(bs)];
+  }
+  const FONT = '"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif';
+  function wrap(cx, text, maxW){
+    const words = text.split(/\s+/), lines = []; let cur = '';
+    for (const w of words) {
+      const t = cur ? cur + ' ' + w : w;
+      if (cx.measureText(t).width <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function drawPhoto(translated){
+    const cv = $('camCanvas'), img = cam.img;
+    cv.width = img.width; cv.height = img.height;
+    const cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0);
+    if (!translated) return;
+    for (const sg of cam.segs) {
+      const b = sg.bbox, h = Math.max(10, b.y1 - b.y0), w = Math.max(10, b.x1 - b.x0), pad = Math.round(h * 0.18);
+      const [r, g, bl] = bgAround(b, pad + 2);
+      const dark = 0.299 * r + 0.587 * g + 0.114 * bl < 140;
+      let size = h * 1.08, lines;
+      do {
+        cx.font = `700 ${size}px ${FONT}`;
+        lines = [sg.ko];
+        if (cx.measureText(sg.ko).width <= w * 1.04) break;
+        size -= Math.max(1, size * 0.06);
+      } while (size > h * 0.55);
+      if (cx.measureText(lines[0]).width > w * 1.04) {
+        size = Math.max(h * 0.55, 11); cx.font = `700 ${size}px ${FONT}`;
+        lines = wrap(cx, sg.ko, w);
+      }
+      const lh = size * 1.18, boxH = Math.max(h, lines.length * lh);
+      const boxW = Math.max(w, ...lines.map(t => cx.measureText(t).width));
+      cx.fillStyle = `rgb(${r},${g},${bl})`;
+      cx.beginPath();
+      if (cx.roundRect) cx.roundRect(b.x0 - pad, b.y0 - pad, boxW + pad * 2, boxH + pad * 2, pad); else cx.rect(b.x0 - pad, b.y0 - pad, boxW + pad * 2, boxH + pad * 2);
+      cx.fill();
+      cx.fillStyle = dark ? '#ffffff' : '#111318';
+      cx.textBaseline = 'middle';
+      const top = b.y0 + (boxH - lines.length * lh) / 2 + lh / 2;
+      lines.forEach((t, i) => cx.fillText(t, b.x0, top + i * lh));
+    }
+  }
+  function drawList(){
+    const box = $('camList'); box.innerHTML = '<h3>번역 목록</h3>';
+    const items = [...cam.segs].sort((a, b) => (a.bbox.y0 - b.bbox.y0) || (a.bbox.x0 - b.bbox.x0));
+    for (const sg of items) {
+      const d = document.createElement('div'); d.className = 'cam-item';
+      d.innerHTML = '<span class="o"></span><span class="k"></span>';
+      d.querySelector('.o').textContent = sg.text; d.querySelector('.k').textContent = sg.ko;
+      box.appendChild(d);
+    }
+  }
+
   // Android back button closes overlays instead of leaving the app
   history.replaceState({ base:true }, '');
   function pushLayer(){ history.pushState({ layer:true }, ''); }
   addEventListener('popstate', () => {
+    if (!$('cam').hidden) { closeCam(); return; }
     if (!$('big').hidden) { $('big').hidden = true; return; }
     if (dlg.open) { dlg.close(); return; }
   });
