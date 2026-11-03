@@ -208,6 +208,12 @@ textarea.input{min-height:80px;resize:vertical}
 .cam-result.zoom canvas{width:220%;max-width:none}
 .cam-list{padding:14px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));display:grid;gap:8px;background:#0d0f15}
 .cam-list h3{margin:4px 0 2px;font-size:13px;color:#9ea3b5;font-weight:700}
+.fx{background:#1a1d27;border-radius:14px;padding:10px 12px;display:grid;gap:6px;font-size:13px;color:#c6c9d6}
+.fx label{display:flex;align-items:center;gap:8px;font-weight:700;color:#fff}
+.fx select{flex:1;min-width:0;height:38px;border-radius:10px;border:1px solid #333849;background:#0d0f15;color:#fff;font:inherit;padding:0 8px}
+.fx a{color:#8fa2ff;font-size:11.5px}
+.cam-item .k{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.won{font-size:15px;font-weight:800;color:#ffd23f;white-space:nowrap}
 .cam-item{background:#1a1d27;border-radius:14px;padding:10px 12px;display:grid;gap:2px;min-width:0}
 .cam-item .o{font-size:13px;color:#9ea3b5;overflow-wrap:anywhere}
 .cam-item .k{font-size:17px;font-weight:650;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
@@ -376,6 +382,7 @@ textarea.input{min-height:80px;resize:vertical}
       <p class="hint">말하다 잠깐 멈췄는데 문장이 중간에 끊기면 길게, 통역이 늦게 나오면 짧게 조절하세요.</p>
     </div>
 
+    <label class="switch"><span>사진 속 가격을 원화로<small>메뉴판을 찍으면 가격을 오늘 환율로 바꿔서 원화로 보여줘요</small></span><input type="checkbox" id="fxOn"></label>
     <label class="switch"><span>대화 맥락 반영<small>앞에서 나눈 대화를 함께 보내서, 생략된 주어나 짧은 대답도 흐름에 맞게 번역해요</small></span><input type="checkbox" id="ctxOn"></label>
     <label class="switch"><span>실시간 미리보기<small>말하는 동안 문장 전체의 번역을 미리 보여줘요</small></span><input type="checkbox" id="liveOn"></label>
     <label class="switch"><span>에코 방지<small>통역 음성이 나오는 동안 마이크를 잠시 멈춰요. 이어폰을 쓰면 꺼도 돼요</small></span><input type="checkbox" id="echoGuard"></label>
@@ -405,7 +412,7 @@ textarea.input{min-height:80px;resize:vertical}
     get(k, d){ try { const v = localStorage.getItem('interp.'+k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v){ try { localStorage.setItem('interp.'+k, JSON.stringify(v)); } catch {} },
   };
-  const S = Object.assign({ target:'en', rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true, partnerGender:'female', voiceChoice:{} }, store.get('settings', {}));
+  const S = Object.assign({ target:'en', rate:1, gap:1, liveOn:true, echoGuard:true, convMode:'auto', ctxOn:true, fxOn:true, partnerGender:'female', voiceChoice:{} }, store.get('settings', {}));
   for (const k of ['engine','apiKey','model','tone','glossary']) delete S[k];
   if (!['en','ja','vi','th'].includes(S.target)) S.target = 'en';
   delete S.voiceGender;
@@ -877,7 +884,7 @@ textarea.input{min-height:80px;resize:vertical}
     drawVoicePickers();
     $('rate').value = S.rate; $('rateVal').textContent = Number(S.rate).toFixed(1) + '×';
     $('gap').value = S.gap; $('gapVal').textContent = Number(S.gap).toFixed(1) + '초';
-    $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard; $('ctxOn').checked = S.ctxOn;
+    $('liveOn').checked = S.liveOn; $('echoGuard').checked = S.echoGuard; $('ctxOn').checked = S.ctxOn; $('fxOn').checked = S.fxOn;
     drawVoices();
   }
   $('openSettings').onclick = () => { fill(); dlg.showModal(); };
@@ -885,7 +892,7 @@ textarea.input{min-height:80px;resize:vertical}
   $('gap').oninput = () => { $('gapVal').textContent = Number($('gap').value).toFixed(1) + '초'; };
   $('rate').oninput = () => { $('rateVal').textContent = Number($('rate').value).toFixed(1) + '×'; };
   dlg.addEventListener('close', () => {
-    Object.assign(S, { rate: Number($('rate').value), gap: Number($('gap').value), liveOn: $('liveOn').checked, echoGuard: $('echoGuard').checked, ctxOn: $('ctxOn').checked });
+    Object.assign(S, { rate: Number($('rate').value), gap: Number($('gap').value), liveOn: $('liveOn').checked, echoGuard: $('echoGuard').checked, ctxOn: $('ctxOn').checked, fxOn: $('fxOn').checked });
     save();
   });
 
@@ -1007,6 +1014,7 @@ textarea.input{min-height:80px;resize:vertical}
     $('cam').hidden = false; pushLayer();
     startCamera();
     getWorker().catch(() => {});   // start downloading the reader while the person frames the shot
+    if (S.fxOn) loadFx();
   }
   function closeCam(){
     stopCamera(); $('cam').hidden = true;
@@ -1041,7 +1049,7 @@ textarea.input{min-height:80px;resize:vertical}
   $('camOrig').onclick = () => {
     const on = $('camOrig').getAttribute('aria-pressed') !== 'true';
     $('camOrig').setAttribute('aria-pressed', String(on)); $('camOrig').textContent = on ? '번역 보기' : '원문 보기';
-    drawPhoto(!on);
+    cam.showTrans = !on; drawPhoto(!on);
   };
   $('camZoom').onclick = () => {
     const on = !$('camResult').classList.contains('zoom');
@@ -1056,19 +1064,93 @@ textarea.input{min-height:80px;resize:vertical}
   // ---- recognise + translate
   const CJK_THAI = '\\u3040-\\u30ff\\u3400-\\u9fff\\uff00-\\uffef\\u0e00-\\u0e7f';
   const joinTight = t => t.replace(new RegExp(`(?<=[${CJK_THAI}])\\s+(?=[${CJK_THAI}])`, 'g'), '');
+  /* ---- prices → Korean won (menus) */
+  const CUR = {
+    USD:{ name:'미국 달러', unit:1, dec:2 }, JPY:{ name:'일본 엔', unit:100, dec:0 }, VND:{ name:'베트남 동', unit:1000, dec:0 },
+    THB:{ name:'태국 바트', unit:1, dec:2 }, EUR:{ name:'유로', unit:1, dec:2 }, GBP:{ name:'영국 파운드', unit:1, dec:2 },
+    CNY:{ name:'중국 위안', unit:1, dec:2 }, TWD:{ name:'대만 달러', unit:1, dec:0 }, HKD:{ name:'홍콩 달러', unit:1, dec:2 },
+    SGD:{ name:'싱가포르 달러', unit:1, dec:2 }, PHP:{ name:'필리핀 페소', unit:1, dec:2 }, AUD:{ name:'호주 달러', unit:1, dec:2 },
+  };
+  const UNIT_NAME = { USD:'달러', JPY:'엔', VND:'동', THB:'바트', EUR:'유로', GBP:'파운드', CNY:'위안', TWD:'대만달러', HKD:'홍콩달러', SGD:'싱가포르달러', PHP:'페소', AUD:'호주달러' };
+  const LANG_CUR = { en:'USD', ja:'JPY', vi:'VND', th:'THB' };
+  // one price: optional currency mark, a number, optional "k" or currency word ("$18", "¥1,200", "45.000đ", "45k", "120 บาท")
+  const PRICE_RX = /^(?:(?:US|HK|NT|S|A)?\$|[¥￥€£₫฿₱]|S(?=\d))?\d[\d.,]*(?:k|K|đ|₫|d|vnd|VND|円|元|yen|baht|บาท|THB|USD|\$|€|-|\.-)?$/;
+  const isPrice = t => {
+    const c = t.replace(/\s+/g, '');
+    if (!PRICE_RX.test(c)) return false;
+    if (/^\d+$/.test(c) && (/^0\d/.test(c) || /^(19|20)\d\d$/.test(c))) return false;   // phone numbers, years
+    return true;
+  };
+  function currencyOf(t){
+    if (/HK\$/.test(t)) return 'HKD'; if (/NT\$/.test(t)) return 'TWD'; if (/(^|[^U])S\$/.test(t)) return 'SGD'; if (/A\$/.test(t)) return 'AUD';
+    if (/\$|USD|^S\d/.test(t)) return 'USD'; if (/[¥￥円]|yen/i.test(t)) return 'JPY'; if (/[₫đ]|vnd|\dk$|\dd$/i.test(t)) return 'VND';
+    if (/[฿]|บาท|baht|thb/i.test(t)) return 'THB'; if (/€/.test(t)) return 'EUR'; if (/£/.test(t)) return 'GBP';
+    if (/₱/.test(t)) return 'PHP'; if (/元/.test(t)) return 'CNY';
+    return null;
+  }
+  function amountOf(t, cur){
+    const m = t.replace(/\s+/g, '').match(/\d[\d.,]*/); if (!m) return null;
+    const n = m[0].replace(/[.,]+$/, '');
+    let v;
+    if (CUR[cur].dec === 0 || /^\d{1,3}([.,]\d{3})+$/.test(n)) v = Number(n.replace(/[.,]/g, ''));   // 1,200 / 45.000
+    else if (/^\d+[.,]\d{1,2}$/.test(n)) v = Number(n.replace(',', '.'));                            // 4.50 / 4,50
+    else v = Number(n.replace(/,/g, ''));
+    if (/\dk$/i.test(t.trim())) v *= 1000;                                                          // 45k
+    return isFinite(v) && v > 0 ? v : null;
+  }
+  const wonText = v => { const r = v < 1000 ? 10 : v < 100000 ? 100 : 1000; return (Math.round(v / r) * r).toLocaleString('ko-KR') + '원'; };
+
+  const FX = { rates:null, date:0, src:'', loading:null };
+  function loadFx(){
+    const c = store.get('fx', null);
+    if (c?.rates && !FX.rates) Object.assign(FX, { rates:c.rates, date:c.date, src:c.src });
+    if (c?.rates && Date.now() - c.t < 12 * 3600e3) return Promise.resolve();
+    return FX.loading ||= (async () => {
+      let rates = null, date = 0, src = '';
+      try {
+        const j = await (await fetch('https://open.er-api.com/v6/latest/USD')).json();
+        if (j.result === 'success' && j.rates?.KRW) { rates = j.rates; date = j.time_last_update_unix * 1000; src = 'er'; }
+      } catch {}
+      if (!rates) try {
+        const j = await (await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json')).json();
+        rates = Object.fromEntries(Object.entries(j.usd).map(([k, v]) => [k.toUpperCase(), v])); date = Date.parse(j.date); src = 'fa';
+      } catch {}
+      if (rates?.KRW) {
+        const keep = Object.fromEntries(['KRW', ...Object.keys(CUR)].filter(k => rates[k]).map(k => [k, rates[k]]));
+        Object.assign(FX, { rates:keep, date, src });
+        store.set('fx', { rates:keep, date, src, t:Date.now() });
+      }
+      FX.loading = null;
+    })();
+  }
+  const krwPer = cur => FX.rates?.KRW && FX.rates?.[cur] ? FX.rates.KRW / FX.rates[cur] : null;
+
   function segmentsFrom(data){
     const lines = data.lines?.length ? data.lines : (data.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(p => p.lines || []));
     const out = [];
     for (const l of lines) {
       const words = (l.words || []).filter(w => w.text.trim());
       if (!words.length) continue;
-      const h = l.bbox.y1 - l.bbox.y0;
+      const h = l.bbox.y1 - l.bbox.y0, line = out.length + ':' + l.bbox.y0;
+      const lineHasText = words.some(w => /\p{L}{2,}/u.test(w.text) && !isPrice(w.text));
       let cur = [words[0]];
+      const make = (ws, price) => {
+        const b = { x0:Math.min(...ws.map(w => w.bbox.x0)), y0:Math.min(...ws.map(w => w.bbox.y0)), x1:Math.max(...ws.map(w => w.bbox.x1)), y1:Math.max(...ws.map(w => w.bbox.y1)) };
+        const text = price ? ws.map(w => w.text).join('') : joinTight(ws.map(w => w.text).join(' ')).trim();
+        const conf = ws.reduce((a, w) => a + w.confidence, 0) / ws.length;
+        out.push({ text, bbox:b, conf, lineH:h, line, price, lineHasText });
+      };
       const flush = () => {
-        const b = { x0:Math.min(...cur.map(w => w.bbox.x0)), y0:Math.min(...cur.map(w => w.bbox.y0)), x1:Math.max(...cur.map(w => w.bbox.x1)), y1:Math.max(...cur.map(w => w.bbox.y1)) };
-        const text = joinTight(cur.map(w => w.text).join(' ')).trim();
-        const conf = cur.reduce((a, w) => a + w.confidence, 0) / cur.length;
-        out.push({ text, bbox:b, conf, lineH:h });
+        // a price at the end of an item ("Iced Americano 4.50", "Phở bò 45.000 đ") becomes its own box
+        let tail = [];
+        for (const n of [2, 1]) {
+          const ws = cur.slice(-n);
+          if (n === 2 && ws.every(w => /^[\d.,]+$/.test(w.text))) continue;   // two separate numbers, e.g. a phone number
+          if (cur.length > n && isPrice(ws.map(w => w.text).join(''))) { tail = ws; break; }
+        }
+        const head = tail.length ? cur.slice(0, -tail.length) : cur;
+        if (head.length) make(head, isPrice(head.map(w => w.text).join('')));
+        if (tail.length) make(tail, true);
       };
       // a wide gap splits a line into separate items (e.g. dish name … price)
       for (let i = 1; i < words.length; i++) {
@@ -1078,6 +1160,7 @@ textarea.input{min-height:80px;resize:vertical}
       flush();
     }
     return out.filter(sg => {
+      if (sg.price) return sg.conf >= 50 && (sg.lineHasText || !!currencyOf(sg.text) || /\dk$/i.test(sg.text));
       const letters = (sg.text.match(/\p{L}/gu) || []).length;
       if (!letters) return false;                                   // prices, numbers, symbols stay as printed
       if (sg.conf < 45 || (sg.conf < 70 && letters <= 2)) return false;  // noise
@@ -1123,15 +1206,22 @@ textarea.input{min-height:80px;resize:vertical}
       try { worker = await getWorker(); }
       catch { camMessage('글자 인식을 불러오지 못했어요', '인터넷 연결을 확인하고 다시 찍어 주세요. 처음 한 번은 인터넷이 필요해요.'); return; }
       const { data } = await worker.recognize(c);
-      const segs = segmentsFrom(data);
-      if (!segs.length) { camMessage('글자를 찾지 못했어요', '글자가 크게 나오도록 더 가까이, 밝은 곳에서 흔들리지 않게 찍어 주세요.'); return; }
+      const all = segmentsFrom(data);
+      const segs = all.filter(sg => !sg.price), prices = all.filter(sg => sg.price);
+      if (!segs.length && !prices.length) { camMessage('글자를 찾지 못했어요', '글자가 크게 나오도록 더 가까이, 밝은 곳에서 흔들리지 않게 찍어 주세요.'); return; }
       busy('한국어로 번역하는 중…', '', 0.85);
+      const fx = S.fxOn && prices.length ? Promise.race([loadFx(), new Promise(r => setTimeout(r, 5000))]) : null;
       const ko = await translateAll(segs.map(sg => sg.text));
       segs.forEach((sg, i) => sg.ko = ko[i]);
       cam.segs = segs.filter(sg => sg.ko && sg.ko.replace(/\s/g, '') !== sg.text.replace(/\s/g, ''));
-      if (!cam.segs.length) { camMessage('번역하지 못했어요', '인터넷 연결을 확인하고 다시 찍어 주세요.'); return; }
+      // one currency per photo: the most common mark printed on it, otherwise the usual one for the chosen language
+      const marks = prices.map(p => currencyOf(p.text)).filter(Boolean);
+      cam.cur = marks.sort((a, b) => marks.filter(x => x === b).length - marks.filter(x => x === a).length)[0] || LANG_CUR[S.target];
+      cam.prices = prices;
+      await fx;
+      if (!cam.segs.length && !(S.fxOn && prices.length && krwPer(cam.cur))) { camMessage('번역하지 못했어요', '인터넷 연결을 확인하고 다시 찍어 주세요.'); return; }
       $('camOrig').setAttribute('aria-pressed', 'false'); $('camOrig').textContent = '원문 보기';
-      drawPhoto(true); drawList();
+      cam.showTrans = true; drawPhoto(true); drawList();
       camView('result'); $('camResult').scrollTop = 0;
     } catch (e) {
       camMessage('사진을 번역하지 못했어요', '다시 찍어 주세요.');
@@ -1165,23 +1255,27 @@ textarea.input{min-height:80px;resize:vertical}
     const cx = cv.getContext('2d');
     cx.drawImage(img, 0, 0);
     if (!translated) return;
+    const boxes = [...cam.segs, ...(cam.prices || [])];
     for (const sg of cam.segs) {
-      const b = sg.bbox, h = Math.max(10, b.y1 - b.y0), w = Math.max(10, b.x1 - b.x0), pad = Math.round(h * 0.18);
+      const b = sg.bbox, h = Math.max(10, b.y1 - b.y0, (sg.lineH || 0) * 0.8), pad = Math.round(h * 0.18);
+      // Korean may run into empty space on the right, up to the next item on the same line (e.g. the price)
+      const nextX = Math.min(cam.img.width - pad, ...boxes.filter(o => o !== sg && o.bbox.x0 > b.x1 && o.bbox.y1 > b.y0 && o.bbox.y0 < b.y1).map(o => o.bbox.x0 - pad * 3));
+      const w = Math.max(10, b.x1 - b.x0, Math.min(nextX - b.x0, (b.x1 - b.x0) * 1.8));
       const [r, g, bl] = bgAround(b, pad + 2);
       const dark = 0.299 * r + 0.587 * g + 0.114 * bl < 140;
       let size = h * 1.08, lines;
       do {
         cx.font = `700 ${size}px ${FONT}`;
         lines = [sg.ko];
-        if (cx.measureText(sg.ko).width <= w * 1.04) break;
+        if (cx.measureText(sg.ko).width <= w) break;
         size -= Math.max(1, size * 0.06);
       } while (size > h * 0.55);
-      if (cx.measureText(lines[0]).width > w * 1.04) {
+      if (cx.measureText(lines[0]).width > w) {
         size = Math.max(h * 0.55, 11); cx.font = `700 ${size}px ${FONT}`;
         lines = wrap(cx, sg.ko, w);
       }
-      const lh = size * 1.18, boxH = Math.max(h, lines.length * lh);
-      const boxW = Math.max(w, ...lines.map(t => cx.measureText(t).width));
+      const lh = size * 1.18, boxH = Math.max(b.y1 - b.y0, lines.length * lh);
+      const boxW = Math.max(b.x1 - b.x0, ...lines.map(t => cx.measureText(t).width));
       cx.fillStyle = `rgb(${r},${g},${bl})`;
       cx.beginPath();
       if (cx.roundRect) cx.roundRect(b.x0 - pad, b.y0 - pad, boxW + pad * 2, boxH + pad * 2, pad); else cx.rect(b.x0 - pad, b.y0 - pad, boxW + pad * 2, boxH + pad * 2);
@@ -1191,14 +1285,73 @@ textarea.input{min-height:80px;resize:vertical}
       const top = b.y0 + (boxH - lines.length * lh) / 2 + lh / 2;
       lines.forEach((t, i) => cx.fillText(t, b.x0, top + i * lh));
     }
+    const rate = S.fxOn && krwPer(cam.cur);
+    if (!rate) return;
+    for (const p of cam.prices || []) {
+      const v = amountOf(p.text, cam.cur); if (!v) continue;
+      const label = wonText(v * rate);
+      const b = p.bbox, h = Math.max(10, b.y1 - b.y0), pad = Math.round(h * 0.18);
+      const [r, g, bl] = bgAround(b, pad + 2);
+      const dark = 0.299 * r + 0.587 * g + 0.114 * bl < 140;
+      const size = Math.max(11, h * 1.0);
+      cx.font = `800 ${size}px ${FONT}`;
+      const tw = cx.measureText(label).width, boxW = Math.max(b.x1 - b.x0, tw);
+      const right = (b.x0 + b.x1) / 2 > cam.img.width * 0.5;      // prices in a right-hand column grow to the left
+      const x = right ? b.x1 - boxW : b.x0;
+      cx.fillStyle = `rgb(${r},${g},${bl})`;
+      cx.beginPath();
+      if (cx.roundRect) cx.roundRect(x - pad, b.y0 - pad, boxW + pad * 2, h + pad * 2, pad); else cx.rect(x - pad, b.y0 - pad, boxW + pad * 2, h + pad * 2);
+      cx.fill();
+      cx.fillStyle = dark ? '#ffd23f' : '#b3261e';
+      cx.textBaseline = 'middle';
+      cx.fillText(label, right ? b.x1 - tw : b.x0, b.y0 + h / 2);
+    }
   }
   function drawList(){
     const box = $('camList'); box.innerHTML = '<h3>번역 목록</h3>';
-    const items = [...cam.segs].sort((a, b) => (a.bbox.y0 - b.bbox.y0) || (a.bbox.x0 - b.bbox.x0));
-    for (const sg of items) {
+    const rate = S.fxOn && krwPer(cam.cur);
+    const prices = (cam.prices || []).map(p => ({ ...p, v: amountOf(p.text, cam.cur) })).filter(p => p.v);
+    if (S.fxOn && prices.length) {
+      const fx = document.createElement('div'); fx.className = 'fx';
+      const sel = document.createElement('select'); sel.id = 'fxCur'; sel.setAttribute('aria-label', '가격 통화');
+      for (const [k, c] of Object.entries(CUR)) { const o = document.createElement('option'); o.value = k; o.textContent = `${c.name} (${k})`; sel.appendChild(o); }
+      sel.value = cam.cur;
+      sel.onchange = () => { cam.cur = sel.value; drawPhoto(cam.showTrans !== false); drawList(); };
+      const lab = document.createElement('label'); lab.append('가격 통화', sel);
+      const info = document.createElement('span');
+      if (rate) {
+        const u = CUR[cam.cur].unit, d = new Date(FX.date);
+        info.textContent = `${u.toLocaleString('ko-KR')}${UNIT_NAME[cam.cur]} = ${Math.round(u * rate).toLocaleString('ko-KR')}원 · ${d.getMonth() + 1}월 ${d.getDate()}일 환율 · 실제 결제 금액과 다를 수 있어요`;
+      } else info.textContent = '환율을 불러오지 못해서 가격은 그대로 보여요. 인터넷 연결을 확인해 주세요.';
+      fx.append(lab, info);
+      if (rate) {
+        const a = document.createElement('a'); a.target = '_blank'; a.rel = 'noopener';
+        if (FX.src === 'er') { a.href = 'https://www.exchangerate-api.com'; a.textContent = 'Rates By Exchange Rate API'; }
+        else { a.href = 'https://github.com/fawazahmed0/exchange-api'; a.textContent = '환율 출처: fawazahmed0 exchange-api'; }
+        fx.appendChild(a);
+      }
+      box.appendChild(fx);
+    }
+    const byLine = {};
+    for (const p of prices) (byLine[p.line] ||= []).push(p);
+    const rows = [...cam.segs.map(sg => ({ sg, y:sg.bbox.y0, x:sg.bbox.x0 }))];
+    const used = new Set();
+    for (const r of rows) { r.prices = byLine[r.sg.line] || []; if (r.prices.length) used.add(r.sg.line); }
+    // a line's prices go with the last text item on that line
+    for (const line of used) { const rs = rows.filter(r => r.sg.line === line); rs.forEach((r, i) => { if (i < rs.length - 1) r.prices = []; }); }
+    for (const p of prices) if (!used.has(p.line)) rows.push({ sg:null, y:p.bbox.y0, x:p.bbox.x0, prices:[p] });
+    rows.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    for (const r of rows) {
       const d = document.createElement('div'); d.className = 'cam-item';
       d.innerHTML = '<span class="o"></span><span class="k"></span>';
-      d.querySelector('.o').textContent = sg.text; d.querySelector('.k').textContent = sg.ko;
+      d.querySelector('.o').textContent = [r.sg?.text, ...r.prices.map(p => p.text)].filter(Boolean).join(' · ');
+      const k = d.querySelector('.k');
+      if (r.sg) k.append(r.sg.ko);
+      for (const p of r.prices) {
+        const w = document.createElement('span'); w.className = 'won';
+        w.textContent = rate ? '약 ' + wonText(p.v * rate) : p.text;
+        k.appendChild(w);
+      }
       box.appendChild(d);
     }
   }
